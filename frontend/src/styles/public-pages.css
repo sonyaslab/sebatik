@@ -1,0 +1,903 @@
+/* ----------------------------------------------------------------------------
+   17. Beranda
+   -------------------------------------------------------------------------- */
+
+.availability-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.75fr) minmax(280px, .7fr);
+  gap: var(--sp-6);
+  align-items: center;
+}
+.availability-line { min-width: 0; border-right: 1px solid var(--line); padding-right: var(--sp-6); }
+.availability-pie { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.pie-stack { position: relative; width: 100%; }
+.pie-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+.pie-center strong {
+  font-size: var(--fs-num-lg);
+  font-weight: 800;
+  letter-spacing: var(--ls-tighter);
+  color: var(--brand);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+/* Child combinator wajib: angka besar dibungkus <span> oleh CountUp, dan
+   tidak boleh ikut mengecil bersama label tahun di bawahnya. */
+.pie-center > span { font-size: var(--fs-caption); color: var(--muted); font-weight: 700; margin-top: 4px; }
+.pie-caption { text-align: center; margin-top: var(--sp-3); }
+.pie-caption b { display: block; font-size: var(--fs-md); font-variant-numeric: tabular-nums; }
+.pie-caption span { display: block; font-size: var(--fs-caption); color: var(--muted); margin-top: 3px; }
+
+/* Rel mendatar untuk kartu makro. Lebar kartu dihitung dari lebar rel dibagi
+   lima dikurangi sela, jadi tepat lima kartu terlihat penuh dan yang keenam
+   terpotong bersih di tepi — isyarat bahwa masih ada lanjutannya.
+   `scroll-snap` menahan tiap halaman supaya berhenti rata, termasuk ketika
+   direnggut dengan jari atau roda tetikus. */
+.macro-rail { position: relative; }
+
+/* Panah diberi lajur sendiri di kiri dan kanan lewat padding pembungkus,
+   bukan ditumpangkan di atas kartu. Kartu memang menyempit sedikit, tetapi
+   tidak ada angka atau pita warna yang tertutup — dan itu yang membedakan
+   kendali yang terbaca dari kendali yang mengganggu.
+
+   Pembungkus ini sengaja hanya memuat rel; titik penanda berada di luarnya,
+   sehingga `top: 50%` jatuh tepat di tengah tinggi kartu. */
+.macro-viewport { position: relative; padding-inline: 52px; }
+.macro-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  width: 42px; height: 42px;
+  display: grid; place-items: center;
+  transform: translateY(-50%);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--brand);
+  box-shadow: var(--e2);
+  transition: background var(--dur-2) var(--ease), color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+}
+.macro-nav.is-prev { left: 0; }
+.macro-nav.is-next { right: 0; }
+.macro-nav:hover {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--on-brand);
+  box-shadow: var(--e3);
+}
+.macro-nav:active { transform: translateY(-50%) scale(.94); }
+.macro-nav:focus-visible { outline: 2px solid var(--line-focus); outline-offset: 2px; }
+
+.macro-track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: calc((100% - var(--sp-4) * 4) / 5);
+  gap: var(--sp-4);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  /* Sengaja tanpa `scroll-behavior: smooth`. Sebagian mesin memperlakukan
+     properti itu sebagai penentu akhir dan mengabaikan opsi `behavior` yang
+     dikirim dari JS — akibatnya pembaca yang meminta "kurangi gerak" tetap
+     mendapat gulir beranimasi. Kelancaran diatur di JS saja. */
+  /* Ruang bagi bayangan kartu yang terangkat saat disentuh kursor; tanpa ini
+     tepi atas-bawahnya terpotong oleh kotak gulir. */
+  padding: 4px 4px 10px;
+  margin: -4px -4px -10px;
+  scrollbar-width: none;
+}
+.macro-track::-webkit-scrollbar { display: none; }
+.macro-track > * { scroll-snap-align: start; }
+
+/* Titik penanda digambar oleh pseudo-elemen, sementara tombolnya sendiri
+   dibiarkan selebar 22px dan tembus pandang. Titik 7px terlalu kecil untuk
+   dibidik — dengan sasaran sebesar ini ia tetap mungil di mata tetapi cukup
+   luas untuk jari maupun kursor. Barisnya boleh melipat karena di layar
+   sempit satu kartu berarti satu halaman, dan titiknya jadi sebanyak kartu. */
+.macro-dots {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: var(--sp-3);
+}
+.macro-dots button {
+  width: 22px; height: 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  display: grid;
+  place-items: center;
+}
+.macro-dots button::before {
+  content: '';
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--line-strong);
+  transition: width var(--dur-2) var(--ease), background var(--dur-2) var(--ease);
+}
+.macro-dots button:hover::before { background: var(--muted); }
+.macro-dots button.is-active::before { width: 18px; border-radius: var(--r-pill); background: var(--brand); }
+.macro-dots button:focus-visible { outline: 2px solid var(--line-focus); outline-offset: -2px; border-radius: var(--r-sm); }
+
+.macro-card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--sp-5);
+  box-shadow: var(--e1);
+  transition: transform var(--dur-3) var(--ease), box-shadow var(--dur-3) var(--ease), border-color var(--dur-3) var(--ease);
+}
+.macro-card::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--tone); }
+.macro-card:hover { transform: translateY(-4px); box-shadow: var(--e3); border-color: color-mix(in srgb, var(--tone) 30%, var(--line)); }
+.macro-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-3); }
+.macro-head span { font-size: var(--fs-sm); font-weight: 800; line-height: var(--lh-snug); color: var(--text); }
+.macro-head i {
+  font-style: normal;
+  font-family: var(--font-num);
+  background: color-mix(in srgb, var(--tone) 13%, transparent);
+  color: var(--tone);
+  border-radius: var(--r-xs);
+  padding: 5px 8px;
+  font-size: var(--fs-label);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.macro-target { display: block; color: var(--muted); margin-top: 10px; font-size: var(--fs-caption); }
+.macro-target b { color: var(--text-2); font-weight: 700; }
+/* Angka memakai tinta teks, bukan warna seri: identitas kartu sudah dibawa
+   pita aksen di tepi kiri dan chip kode di kanan atas. Nilai yang berwarna
+   membuat pembaca mengira warnanya punya arti data. */
+/* Ukuran angka sorotan. Ketika isinya kalimat "Belum tersedia", ukurannya
+   diturunkan jauh dan warnanya diredam — kartu tanpa data tidak boleh menarik
+   mata lebih kuat daripada kartu yang punya angka. */
+.macro-value.is-empty,
+.macro-selector .macro-track > button > strong.is-empty {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  line-height: var(--lh-snug);
+  letter-spacing: 0;
+  color: var(--muted);
+  white-space: normal;
+}
+.macro-value {
+  font-size: var(--fs-num);
+  font-weight: 800;
+  color: var(--text);
+  /* Didorong ke bawah supaya angka seluruh kartu duduk pada garis yang sama
+     meskipun panjang judulnya berbeda-beda. */
+  margin: auto 0 var(--sp-2);
+  padding-top: var(--sp-4);
+  letter-spacing: var(--ls-tighter);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.delta { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-caption); font-weight: 700; line-height: var(--lh-snug); }
+.delta i { font-style: normal; font-size: 8px; }
+.delta-up { color: var(--trend-up); }
+.delta-down { color: var(--trend-down); }
+.delta-flat { color: var(--muted); }
+
+/* Kelima kelompok sasaran visi berisi jumlah indikator yang berbeda-beda —
+   tiga, tiga, satu, satu, dua. Dengan grid dua kolom, kartu bertetangga dalam
+   satu baris dipaksa setinggi yang tertinggi, sehingga kelompok berisi satu
+   indikator berakhir sebagai kotak menjulang yang isinya sepertiga; kartu
+   terakhir pun berdiri sendiri dan meninggalkan separuh baris kosong.
+
+   Tata kolom (multi-column) menyusunnya seperti rak: tiap kartu setinggi
+   isinya sendiri, dan peramban membagi rak supaya kedua kolom berakhir pada
+   ketinggian yang hampir sama. Tidak ada lagi kotak yang menjulang kosong,
+   tidak ada baris yang setengah terisi. `break-inside` menjaga satu kartu
+   tidak terbelah di antara dua kolom. */
+.vision-grid {
+  column-count: 2;
+  column-gap: var(--sp-5);
+}
+.vision-grid > .vision-card {
+  break-inside: avoid;
+  margin-bottom: var(--sp-5);
+}
+.vision-grid > .vision-card:last-child { margin-bottom: 0; }
+.vision-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+  transition: box-shadow var(--dur-3) var(--ease), transform var(--dur-3) var(--ease);
+}
+.vision-card:hover { box-shadow: var(--e2); transform: translateY(-2px); }
+.vision-card > header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 3px solid var(--tone);
+  background: color-mix(in srgb, var(--tone) 7%, var(--surface));
+}
+.vision-card > header > span {
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  border-radius: var(--r-sm);
+  background: var(--tone);
+  color: #fff;
+  font-weight: 800;
+  font-size: var(--fs-caption);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+.vision-card h3 { font-size: var(--fs-body); line-height: var(--lh-snug); }
+.vision-card header small { display: block; margin-top: 3px; color: var(--muted); font-size: var(--fs-caption); }
+.vision-list { padding: var(--sp-2) var(--sp-5) var(--sp-4); }
+.vision-list > div {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  gap: var(--sp-3);
+  align-items: center;
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--line);
+}
+.vision-list > div:last-child { border-bottom: 0; }
+.vision-list i { font-style: normal; font-family: var(--font-num); color: var(--tone); font-size: var(--fs-caption); font-weight: 700; }
+.vision-list > div > span { font-size: var(--fs-caption); line-height: var(--lh-snug); color: var(--text-2); }
+.vision-list strong { text-align: right; font-size: var(--fs-md); color: var(--text); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vision-list strong small { display: block; font-size: var(--fs-label); color: var(--muted); font-weight: 600; margin-top: 3px; }
+
+.availability-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-4); }
+.availability-card {
+  --tone: var(--series-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--sp-5);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--tone) 8%, var(--surface)), var(--surface) 62%);
+  box-shadow: var(--e1);
+}
+.availability-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); }
+.availability-card-head > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  color: var(--tone);
+  font-size: var(--fs-label);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--ls-wide);
+}
+.availability-card-head > span b { font-size: var(--fs-lg); line-height: 1; }
+.availability-card-head strong { color: var(--text); font-size: var(--fs-xl); line-height: 1; font-variant-numeric: tabular-nums; }
+.availability-card h3 { margin-top: var(--sp-3); font-size: var(--fs-sm); line-height: var(--lh-snug); }
+.availability-track { height: 8px; margin-top: var(--sp-4); overflow: hidden; border-radius: 999px; background: var(--surface-3); }
+.availability-track i { display: block; height: 100%; border-radius: inherit; background: var(--tone); transition: width 700ms var(--ease); }
+.availability-card p { margin-top: var(--sp-3); color: var(--muted); font-size: var(--fs-caption); line-height: var(--lh-snug); }
+
+/* ----------------------------------------------------------------------------
+   18. Penjelajah indikator
+   -------------------------------------------------------------------------- */
+
+.indicator-browser { padding: 0; overflow: hidden; }
+.browser-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  padding: var(--sp-5) clamp(18px, 2.2vw, 26px);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  flex-wrap: wrap;
+}
+.browser-toolbar .field { flex-direction: row; align-items: center; gap: var(--sp-3); }
+.browser-toolbar .field > span { white-space: nowrap; }
+.browser-toolbar .field:first-child select { min-width: 340px; }
+
+.browser-layout { display: grid; grid-template-columns: 320px minmax(0, 1fr); min-height: 640px; }
+.indicator-picker { border-right: 1px solid var(--line); background: var(--surface-2); display: flex; flex-direction: column; }
+.indicator-picker > header { padding: var(--sp-5); border-bottom: 1px solid var(--line); }
+.indicator-picker > header b { display: block; font-size: var(--fs-body); line-height: var(--lh-snug); }
+.indicator-picker > header span { font-size: var(--fs-caption); color: var(--muted); }
+.indicator-picker > div { max-height: 720px; overflow: auto; padding: var(--sp-3); display: flex; flex-direction: column; gap: 3px; }
+.indicator-picker button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: var(--sp-3);
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  border-radius: var(--r-sm);
+  padding: 12px;
+  transition: background var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
+}
+.indicator-picker button:hover { background: var(--surface); transform: translateX(3px); }
+.indicator-picker button.active {
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--brand) 38%, var(--line));
+  box-shadow: var(--e1);
+}
+.indicator-picker button > i {
+  font-style: normal;
+  font-family: var(--font-num);
+  color: var(--brand);
+  font-size: var(--fs-caption);
+  font-weight: 700;
+}
+.indicator-picker button > span { font-size: var(--fs-caption); line-height: var(--lh-snug); }
+.indicator-picker button small { display: block; color: var(--muted); font-size: var(--fs-label); margin-top: 5px; }
+
+.indicator-content { padding: clamp(18px, 2.4vw, 28px); min-width: 0; }
+.indicator-hero { display: flex; justify-content: space-between; gap: var(--sp-5); align-items: flex-start; flex-wrap: wrap; }
+/* Kode indikator dibaca sebagai identitas, bukan data — karena itu memakai
+   mono dengan tinta redup, bukan warna seri yang bisa disalahartikan. */
+.indicator-hero > div:first-child > span {
+  display: block;
+  font-family: var(--font-num);
+  color: var(--muted);
+  font-size: var(--fs-caption);
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+.indicator-hero h2 { font-size: var(--fs-2xl); margin: 8px 0; }
+.indicator-hero p { font-size: var(--fs-sm); color: var(--muted); }
+.source-chip {
+  max-width: 300px;
+  display: flex;
+  gap: var(--sp-3);
+  align-items: center;
+  padding: 12px 15px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--brand);
+}
+.source-chip span { font-size: var(--fs-caption); font-weight: 700; line-height: var(--lh-snug); color: var(--text-2); }
+.source-chip small { display: block; color: var(--muted); font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 2px; }
+
+.series-cards { display: flex; gap: var(--sp-2); overflow: auto; margin: var(--sp-6) 0 var(--sp-2); padding-bottom: 6px; }
+.series-cards > div {
+  min-width: 100px;
+  padding: 12px 13px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  flex: 0 0 auto;
+  transition: transform var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
+}
+.series-cards > div:hover { transform: translateY(-3px); border-color: var(--line-strong); }
+.series-cards > div.selected {
+  background: color-mix(in srgb, var(--series-2) 12%, var(--surface));
+  border-color: var(--series-2);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--series-2) 18%, transparent);
+}
+.series-cards span { font-size: var(--fs-label); color: var(--muted); font-weight: 800; letter-spacing: .06em; }
+.series-cards b { font-size: var(--fs-md); color: var(--text); margin: 6px 0; font-variant-numeric: tabular-nums; }
+.series-cards small { font-size: var(--fs-label); color: var(--muted); font-weight: 700; }
+/* Memakai token tren yang sama dengan DeltaPill, jadi kedua tempat memberi
+   arti yang sama pada warna yang sama — dan keduanya ikut berganti di mode
+   gelap tanpa aturan tambahan. */
+.series-cards small.growth-up { color: var(--trend-up); }
+.series-cards small.growth-down { color: var(--trend-down); }
+.series-cards small.growth-flat { color: var(--muted); }
+.main-series { margin-top: var(--sp-3); border-top: 1px solid var(--line); padding-top: var(--sp-4); }
+
+/* --- Peta & sebaran wilayah ---------------------------------------------- */
+
+.regional-layout { display: grid; grid-template-columns: minmax(340px, .85fr) minmax(0, 1.35fr); gap: var(--sp-5); }
+.map-panel, .regional-charts > div, .macro-trend, .macro-map, .macro-bars {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  padding: var(--sp-4);
+  min-width: 0;
+}
+.map-panel h3, .regional-charts h3, .macro-trend h3, .macro-map h3, .macro-bars h3 { font-size: var(--fs-body); margin-bottom: var(--sp-3); }
+
+.kaltara-map svg { width: 100%; height: 356px; display: block; }
+.kaltara-map path {
+  fill: var(--map-empty);
+  stroke: var(--map-stroke);
+  stroke-width: 1.6;
+  cursor: pointer;
+  transition: fill var(--dur-2) var(--ease), stroke-width var(--dur-2) var(--ease), filter var(--dur-2) var(--ease);
+}
+.kaltara-map path[data-status='TERSEDIA'] { fill: var(--status-provinsi); }
+.kaltara-map path:hover { filter: brightness(1.12); stroke-width: 2.4; }
+.kaltara-map path.active {
+  fill: var(--series-2);
+  stroke: var(--surface);
+  stroke-width: 2.8;
+  filter: drop-shadow(0 4px 12px color-mix(in srgb, var(--series-2) 45%, transparent));
+}
+/* Kotak biru yang muncul saat wilayah diklik adalah cincin fokus bawaan
+   peramban. Pada <path>, cincin itu digambar mengelilingi kotak pembatas —
+   bukan mengikuti bentuk pulaunya — sehingga tampil sebagai persegi panjang
+   yang tidak ada hubungannya dengan peta.
+
+   Yang dilepas hanya cincin untuk tetikus. Pengguna papan tik tetap perlu tahu
+   wilayah mana yang sedang disorot, jadi `:focus-visible` menggantinya dengan
+   penebalan garis tepi — penanda yang mengikuti bentuk wilayahnya sendiri. */
+.kaltara-map path:focus { outline: none; }
+.kaltara-map path:focus-visible {
+  outline: none;
+  stroke: var(--line-focus);
+  stroke-width: 3.4;
+}
+.map-legend { display: flex; justify-content: center; gap: var(--sp-4); font-size: var(--fs-caption); color: var(--muted); margin-top: var(--sp-2); }
+.map-legend span { display: flex; align-items: center; gap: 6px; }
+.map-legend i { width: 11px; height: 11px; border-radius: 3px; background: var(--map-empty); }
+.map-legend i.has { background: var(--status-provinsi); }
+
+.selected-region {
+  position: absolute;
+  left: var(--sp-5);
+  bottom: 52px;
+  padding: 12px 14px;
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+  box-shadow: var(--e2);
+  display: flex;
+  flex-direction: column;
+  animation: pop var(--dur-3) var(--ease) both;
+}
+.selected-region span { font-size: var(--fs-caption); color: var(--muted); }
+.selected-region b { font-size: var(--fs-lg); color: var(--text); font-variant-numeric: tabular-nums; margin: 2px 0; }
+.selected-region small { font-size: var(--fs-label); color: var(--muted); }
+
+.regional-charts { display: grid; grid-template-columns: 1fr; gap: var(--sp-4); }
+
+/* ----------------------------------------------------------------------------
+   19. Capaian 2045
+   -------------------------------------------------------------------------- */
+
+.achievement-filters {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1.6fr .7fr .9fr;
+  gap: var(--sp-3);
+  padding: var(--sp-5);
+  background: var(--surface-2);
+}
+.achievement-overview { padding: clamp(18px, 2.4vw, 28px); }
+.achievement-heading > span { display: block; font-family: var(--font-num); font-size: var(--fs-caption); color: var(--muted); font-weight: 700; letter-spacing: .04em; }
+.achievement-heading h2 { font-size: var(--fs-2xl); margin: 8px 0; }
+.achievement-heading p { font-size: var(--fs-sm); color: var(--muted); margin-bottom: var(--sp-5); }
+
+.achievement-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, .8fr); gap: var(--sp-5); }
+.growth-chart, .tracker-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  padding: var(--sp-5);
+  min-width: 0;
+}
+.growth-chart .section-head, .tracker-card .section-head { margin-bottom: var(--sp-4); }
+.tracker-donut { position: relative; }
+.tracker-donut > div:last-child {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+.tracker-donut strong {
+  font-size: var(--fs-num);
+  font-weight: 800;
+  color: var(--brand);
+  letter-spacing: var(--ls-tighter);
+  font-variant-numeric: tabular-nums;
+}
+.tracker-donut > div:last-child > span { font-size: var(--fs-caption); color: var(--muted); font-weight: 700; margin-top: 2px; }
+.tracker-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); margin: var(--sp-4) 0 0; }
+.tracker-stats > div {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 12px 10px;
+  text-align: center;
+}
+.tracker-stats dt { font-size: var(--fs-label); color: var(--muted); line-height: var(--lh-snug); }
+.tracker-stats dd { font-size: var(--fs-body); font-weight: 800; color: var(--text); margin: 6px 0 0; font-variant-numeric: tabular-nums; }
+
+.target-trajectory { padding: clamp(18px, 2.4vw, 28px); }
+.insight-box {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--r-md);
+  background: var(--brand-soft);
+  border: 1px solid color-mix(in srgb, var(--brand) 24%, var(--line));
+  color: var(--brand);
+}
+.insight-box b { font-size: var(--fs-sm); }
+.insight-box p { font-size: var(--fs-sm); line-height: var(--lh-normal); color: var(--text-2); margin-top: 5px; }
+.method-note { font-size: var(--fs-caption); color: var(--muted); line-height: var(--lh-normal); margin-top: var(--sp-3); }
+
+/* ----------------------------------------------------------------------------
+   20. Insight makro
+   -------------------------------------------------------------------------- */
+
+/* Judul di kiri, pemilih wilayah rata kanan, keduanya disejajarkan ke tengah
+   tinggi baris — sama seperti pemilih tahun di beranda, supaya kedua halaman
+   memakai pola kepala yang sama. */
+.insight-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-5);
+  flex-wrap: wrap;
+}
+.insight-toolbar > div:first-child { min-width: 0; flex: 1 1 320px; }
+.insight-toolbar h2 { font-size: var(--fs-xl); margin-top: 6px; }
+.insight-toolbar > .year-picker { flex: 0 0 auto; }
+
+/* Pemilih indikator memakai rel yang sama dengan korsel beranda; yang berbeda
+   hanya bentuk kartunya. Semua aturan di bawah diikat ke `.macro-track` supaya
+   tidak ikut mengenai tombol panah dan titik penanda — keduanya juga <button>
+   dan berada di dalam `.macro-selector` yang sama.
+
+   Kartunya dibuat rendah dan melebar: nama indikator dipotong pada dua baris
+   sehingga kartu terpanjang dan terpendek berakhir sama tinggi, dan seluruh
+   deret terbaca sebagai barisan persegi panjang, bukan kotak-kotak yang naik
+   turun mengikuti panjang nama. */
+/* Tiap kartu membawa nada seri-nya sendiri: latar bergradasi tipis dari nada
+   itu, garis tepi senada, dan pita di sisi kiri yang selalu terlihat. Warna di
+   sini bukan hiasan — ia yang membedakan satu kartu dari kartu di sebelahnya
+   pada deretan yang isinya seragam, dan yang menandai kartu terpilih tanpa
+   perlu menambah lencana. */
+.macro-selector .macro-track > button {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  border: 1px solid color-mix(in srgb, var(--tone) 26%, var(--line));
+  border-radius: var(--r-md);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--tone) 11%, var(--surface)), var(--surface) 68%);
+  color: var(--text);
+  padding: 12px 14px 11px 17px;
+  box-shadow: var(--e1);
+  transition: transform var(--dur-3) var(--ease), box-shadow var(--dur-3) var(--ease), border-color var(--dur-3) var(--ease);
+}
+.macro-selector .macro-track > button::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--tone);
+}
+.macro-selector .macro-track > button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--tone) 22%, transparent);
+  border-color: var(--tone);
+}
+.macro-selector .macro-track > button.active {
+  border-color: var(--tone);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--tone) 22%, var(--surface)), var(--surface) 78%);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--tone) 26%, transparent);
+}
+.macro-selector .macro-track > button.active::before { width: 6px; }
+.macro-selector .macro-track > button:focus-visible { outline: 2px solid var(--line-focus); outline-offset: 2px; }
+
+.macro-selector .macro-track > button > span { display: block; font-size: var(--fs-label); color: var(--muted); font-weight: 700; }
+.macro-selector .macro-track > button > strong {
+  display: block;
+  font-size: var(--fs-num-sm);
+  line-height: 1.15;
+  color: var(--text);
+  margin: 3px 0 4px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--ls-tight);
+  /* Sebagian kartu berisi "Belum tersedia", bukan angka; tanpa pemotongan ini
+     kalimatnya melipat dan mendorong kartu jadi lebih tinggi dari yang lain. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.macro-selector .macro-track > button > b {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  min-height: 2lh;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-snug);
+  color: var(--text-2);
+}
+.macro-selector .macro-track > button > small {
+  display: block;
+  margin-top: auto;
+  padding-top: 7px;
+  font-size: var(--fs-label);
+  color: var(--muted);
+  font-weight: 700;
+  line-height: var(--lh-snug);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Token tren yang sama dengan kartu tahun dan DeltaPill. */
+.macro-selector .macro-track > button > small.growth-up { color: var(--trend-up); }
+.macro-selector .macro-track > button > small.growth-down { color: var(--trend-down); }
+.macro-selector .macro-track > button > small.growth-flat { color: var(--muted); }
+
+.insight-analysis { padding: clamp(18px, 2.4vw, 28px); }
+.insight-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(420px, .85fr); gap: var(--sp-5); }
+.macro-regional { display: grid; gap: var(--sp-3); }
+
+/* ----------------------------------------------------------------------------
+   21. Validitas
+   -------------------------------------------------------------------------- */
+
+.validity-panel { padding: 0; overflow: hidden; }
+.validity-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-5) clamp(18px, 2.2vw, 26px);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.validity-toolbar .field { flex-direction: row; align-items: center; }
+.validity-toolbar .search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 0 1 440px;
+  min-width: 280px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--muted);
+  transition: border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+}
+.validity-toolbar .search:focus-within { border-color: var(--line-focus); box-shadow: 0 0 0 3px var(--brand-soft); }
+.validity-toolbar .search svg { flex: 0 0 auto; }
+.validity-toolbar .search input {
+  width: 100%; min-width: 0; height: 42px;
+  padding: 0; border: 0; outline: 0;
+  background: transparent; color: var(--text);
+  font-size: var(--fs-sm);
+}
+
+.validity-table { width: 100%; border-collapse: collapse; min-width: 980px; }
+/* Kolom tanggal dan status verifikasi diberi lebar minimum supaya kalimatnya
+   tidak terpecah menjadi menara satu kata yang menggelembungkan tinggi baris. */
+.validity-table td:nth-child(3), .validity-table th:nth-child(3) { min-width: 168px; }
+.validity-table td:nth-child(4), .validity-table th:nth-child(4) { min-width: 196px; }
+.validity-table th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--surface-2);
+  text-align: left;
+  padding: 14px 16px;
+  color: var(--muted);
+  font-size: var(--fs-label);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.validity-table td { padding: 15px 16px; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); vertical-align: middle; }
+.validity-table tbody tr { transition: background var(--dur-1) var(--ease); }
+.validity-table tr:hover td { background: var(--surface-2); }
+.validity-table td:first-child { min-width: 270px; }
+.validity-table td:first-child b { display: block; font-size: var(--fs-sm); line-height: var(--lh-snug); color: var(--text); }
+.validity-table td:first-child small, .update-cell small { display: block; font-size: var(--fs-caption); color: var(--muted); margin-top: 4px; }
+.validity-table td:first-child small { font-family: var(--font-num); }
+
+.validation-state { display: flex; align-items: flex-start; gap: 8px; font-weight: 700; line-height: var(--lh-snug); font-size: var(--fs-caption); }
+.validation-state > i { width: 9px; height: 9px; border-radius: 50%; margin-top: 3px; flex: 0 0 auto; }
+.validation-state.verified { color: var(--success); }
+.validation-state.verified > i { background: var(--capaian-tercapai); box-shadow: 0 0 0 4px var(--success-soft); }
+.validation-state.waiting { color: var(--warn); }
+.validation-state.waiting > i { background: var(--capaian-mendekati); box-shadow: 0 0 0 4px var(--warn-soft); }
+.validation-state small { display: block; color: var(--muted); font-size: var(--fs-label); font-weight: 600; margin-top: 3px; }
+.update-cell { line-height: var(--lh-snug); font-size: var(--fs-caption); }
+
+.indicator-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-label);
+  font-weight: 800;
+  white-space: nowrap;
+}
+.indicator-state::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.indicator-state.tersedia { background: var(--success-soft); color: var(--success); }
+.indicator-state.proxy { background: var(--info-soft); color: var(--info); }
+.indicator-state.belum-tersedia { background: var(--warn-soft); color: var(--warn); }
+
+.evidence-links { display: flex; flex-direction: column; gap: 5px; max-width: 200px; }
+.evidence-links button {
+  display: flex; align-items: center; gap: 7px;
+  border: 0; background: transparent;
+  color: var(--info); font-size: var(--fs-caption);
+  text-align: left; padding: 3px 0;
+  border-radius: var(--r-xs);
+  overflow: hidden;
+}
+.evidence-links button:hover { text-decoration: underline; }
+.no-evidence { font-size: var(--fs-caption); color: var(--muted); }
+.metadata-eye {
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--info);
+  transition: all var(--dur-2) var(--ease);
+}
+.metadata-eye:hover { background: var(--info-soft); transform: translateY(-2px); }
+.metadata-modal-backdrop {
+  position: fixed; inset: 0; z-index: 120;
+  display: grid; place-items: center; padding: clamp(12px,3vw,32px);
+  background: color-mix(in srgb, var(--ink) 72%, transparent);
+  backdrop-filter: blur(7px);
+}
+.metadata-modal {
+  width: min(1040px,100%); max-height: 92vh; overflow: auto;
+  padding: clamp(18px,3vw,32px); border-radius: var(--r-xl);
+  background: var(--surface); color: var(--text); box-shadow: var(--shadow-xl);
+}
+.metadata-modal > header { display:flex; justify-content:space-between; gap:20px; align-items:flex-start; margin-bottom:var(--sp-5); }
+.metadata-modal > header span { color:var(--muted); font-size:var(--fs-caption); font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
+.metadata-modal > header h2 { margin:6px 0 0; font-size:clamp(1.25rem,2.2vw,1.8rem); }
+.metadata-modal > header button { width:40px; height:40px; display:grid; place-items:center; border:1px solid var(--line); border-radius:var(--r-sm); background:var(--surface-2); color:var(--text); }
+.metadata-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--sp-3); margin:var(--sp-4) 0; }
+.metadata-grid article,.formula-card { padding:var(--sp-4); border:1px solid var(--line); border-radius:var(--r-md); background:var(--surface-2); }
+.metadata-grid small,.formula-card small { display:block; margin-bottom:8px; color:var(--muted); font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
+.metadata-grid p { margin:0; white-space:pre-wrap; line-height:var(--lh-relaxed); }
+.formula-card pre,.formula-latex { margin:0; padding:14px; overflow:auto; white-space:pre-wrap; font-family:var(--font-sans); line-height:1.7; border-radius:var(--r-sm); background:var(--surface); }
+.formula-card em { display:block; margin-top:9px; color:var(--muted); font-size:var(--fs-caption); }
+.metadata-values { margin-top:var(--sp-5); max-height:340px; border:1px solid var(--line); border-radius:var(--r-md); }
+.metadata-values table { min-width:680px; }
+.empty-inline { padding:var(--sp-5); color:var(--muted); }
+.metadata-loading { width:min(680px,100%); padding:24px; border-radius:var(--r-lg); background:var(--surface); }
+@media (max-width:700px){.metadata-grid{grid-template-columns:1fr}.metadata-modal{max-height:95vh}}
+
+/* ----------------------------------------------------------------------------
+   22. Detail indikator
+   -------------------------------------------------------------------------- */
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--brand);
+  text-decoration: none;
+  padding: 8px 14px 8px 10px;
+  border-radius: var(--r-pill);
+  background: var(--brand-soft);
+  align-self: flex-start;
+  transition: transform var(--dur-2) var(--ease), background var(--dur-2) var(--ease);
+}
+.back:hover { transform: translateX(-3px); background: color-mix(in srgb, var(--brand) 16%, transparent); }
+
+.detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-5); flex-wrap: wrap; }
+.detail-head h2 { font-size: var(--fs-2xl); margin: var(--sp-3) 0 6px; }
+.detail-head p { font-size: var(--fs-sm); color: var(--muted); }
+
+.panel details { border-top: 1px solid var(--line); padding: var(--sp-4) 0; }
+.panel details:first-of-type { border-top: 0; }
+.panel summary {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.panel summary::-webkit-details-marker { display: none; }
+.panel summary::after {
+  content: '';
+  width: 9px; height: 9px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg);
+  transition: transform var(--dur-2) var(--ease);
+  flex: 0 0 auto;
+}
+.panel details[open] summary::after { transform: rotate(-135deg); }
+.panel details p { margin-top: var(--sp-3); font-size: var(--fs-sm); line-height: var(--lh-relaxed); color: var(--text-2); animation: rise var(--dur-3) var(--ease) both; }
+
+.governance dl { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: var(--sp-3); font-size: var(--fs-sm); margin: 0; }
+.governance dt { color: var(--muted); }
+.governance dd { margin: 0; font-weight: 600; }
+.governance > a { display: inline-flex; align-items: center; gap: 6px; margin-top: var(--sp-3); font-size: var(--fs-sm); color: var(--brand); text-decoration: none; }
+.governance > a:hover { text-decoration: underline; }
+
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 15px;
+  border-radius: var(--r-sm);
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: var(--fs-caption);
+  font-weight: 700;
+  text-decoration: none;
+  transition: all var(--dur-2) var(--ease);
+}
+.button-link:hover { background: color-mix(in srgb, var(--brand) 18%, transparent); transform: translateY(-2px); }
+
+/* ----------------------------------------------------------------------------
+   23. Analitik
+   -------------------------------------------------------------------------- */
+
+.gap-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); }
+.gap-cards div { padding: var(--sp-5); border-radius: var(--r-md); background: var(--surface-2); border: 1px solid var(--line); }
+.gap-cards span { display: block; font-size: var(--fs-label); color: var(--muted); text-transform: uppercase; letter-spacing: .07em; font-weight: 800; }
+.gap-cards b { display: block; margin: 9px 0 6px; font-size: var(--fs-num-sm); font-weight: 800; letter-spacing: var(--ls-tighter); font-variant-numeric: tabular-nums; }
+.gap-cards small { display: block; font-size: var(--fs-caption); color: var(--muted); }
+
+.ranking { list-style: none; margin: 0; padding: 0; counter-reset: rank; }
+.ranking li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-sm);
+}
+.ranking li::before {
+  counter-increment: rank;
+  content: counter(rank);
+  width: 24px; height: 24px;
+  border-radius: var(--r-xs);
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: var(--fs-caption);
+  font-weight: 800;
+  display: grid; place-items: center;
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+.ranking li span { flex: 1; min-width: 0; }
+.ranking li b { font-weight: 800; font-variant-numeric: tabular-nums; }
+
+.stat-line {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 10px 15px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: var(--sp-3);
+}
