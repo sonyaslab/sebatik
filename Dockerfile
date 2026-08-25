@@ -20,8 +20,12 @@ COPY --from=frontend /build/dist frontend/dist
 # dukung dipasang sebagai volume supaya tidak hilang saat image diganti.
 RUN mkdir -p /app/data/processed/arsip-unggahan /app/data/processed/bukti-dukung /app/backup
 EXPOSE 8000
-# --proxy-headers: di balang proxy Coolify/Cloudflare, IP klien diambil dari
+# Migrasi skema berjalan sebelum server: deployment satu container
+# (aplikasi Dockerfile di Coolify) tidak punya service migrasi terpisah.
+# alembic upgrade head idempoten — tidak melakukan apa-apa saat skema
+# sudah mutakhir, sehingga aman diulang tiap restart.
+# --proxy-headers: di balik proxy Coolify/Cloudflare, IP klien diambil dari
 # X-Forwarded-For supaya pembatas laju login membatasi penyerang, bukan proxy.
 # Daftar alamat terpercaya diatur lewat env FORWARDED_ALLOW_IPS (default
 # 127.0.0.1, tidak memercayai header dari luar).
-CMD ["python","-m","uvicorn","backend.app.main:app","--host","0.0.0.0","--port","8000","--proxy-headers"]
+CMD ["sh","-c","python -m alembic -c backend/alembic.ini upgrade head && python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --proxy-headers"]
