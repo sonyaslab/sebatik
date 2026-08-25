@@ -30,43 +30,86 @@ NAMA_SASARAN_VISI = (
     "Penurunan Emisi GRK menuju Net Zero Emission",
 )
 NAMA_MISI = (
-    "Transformasi Sosial", "Transformasi Ekonomi", "Transformasi Tata Kelola",
-    "Supremasi Hukum, Stabilitas, dan Kepemimpinan Indonesia", "Ketahanan Sosial Budaya dan Ekologi",
+    "Transformasi Sosial",
+    "Transformasi Ekonomi",
+    "Transformasi Tata Kelola",
+    "Supremasi Hukum, Stabilitas, dan Kepemimpinan Indonesia",
+    "Ketahanan Sosial Budaya dan Ekologi",
     "Pembangunan Kewilayahan yang Merata dan Berkeadilan",
-    "Sarana dan Prasarana yang Berkualitas dan Ramah Lingkungan", "Kesinambungan Pembangunan",
+    "Sarana dan Prasarana yang Berkualitas dan Ramah Lingkungan",
+    "Kesinambungan Pembangunan",
 )
 NAMA_ARAH = (
-    "Kesehatan untuk Semua", "Pendidikan Berkualitas yang Merata", "Perlindungan Sosial yang Adaptif",
-    "Iptek, Inovasi, dan Produktivitas Ekonomi", "Penerapan Ekonomi Hijau", "Transformasi Digital",
-    "Integrasi Ekonomi Domestik dan Global", "Perkotaan sebagai Pusat Pertumbuhan Ekonomi",
+    "Kesehatan untuk Semua",
+    "Pendidikan Berkualitas yang Merata",
+    "Perlindungan Sosial yang Adaptif",
+    "Iptek, Inovasi, dan Produktivitas Ekonomi",
+    "Penerapan Ekonomi Hijau",
+    "Transformasi Digital",
+    "Integrasi Ekonomi Domestik dan Global",
+    "Perkotaan sebagai Pusat Pertumbuhan Ekonomi",
     "Regulasi dan Tata Kelola yang Berintegritas dan Adaptif",
-    "Hukum Berkeadilan, Keamanan Nasional Tangguh, dan Demokrasi Substansial", "Stabilitas Ekonomi Makro",
-    "Ketangguhan Diplomasi dan Pertahanan Berdaya Gentar Kawasan", "Beragama Maslahat dan Berkebudayaan Maju",
-    "Keluarga Berkualitas, Kesetaraan Gender, dan Masyarakat Inklusif", "Lingkungan Hidup Berkualitas",
-    "Berketahanan Energi, Air, dan Kemandirian Pangan", "Resiliensi terhadap Bencana dan Perubahan Iklim",
+    "Hukum Berkeadilan, Keamanan Nasional Tangguh, dan Demokrasi Substansial",
+    "Stabilitas Ekonomi Makro",
+    "Ketangguhan Diplomasi dan Pertahanan Berdaya Gentar Kawasan",
+    "Beragama Maslahat dan Berkebudayaan Maju",
+    "Keluarga Berkualitas, Kesetaraan Gender, dan Masyarakat Inklusif",
+    "Lingkungan Hidup Berkualitas",
+    "Berketahanan Energi, Air, dan Kemandirian Pangan",
+    "Resiliensi terhadap Bencana dan Perubahan Iklim",
 )
 NAMA_IUP = (
-    "Usia Harapan Hidup", "Kesehatan Ibu dan Anak", "Penanganan Tuberkulosis",
-    "Cakupan Kepesertaan Jaminan Kesehatan Nasional", "Hasil Pembelajaran", "Rata-rata Lama Sekolah",
-    "Harapan Lama Sekolah", "Proporsi Penduduk Berkualifikasi Pendidikan Tinggi",
-    "Pekerja Lulusan Pendidikan Menengah dan Tinggi di Bidang Keahlian Menengah Tinggi", "Tingkat Kemiskinan",
-    "Cakupan Kepesertaan Jaminan Sosial Ketenagakerjaan", "Penyandang Disabilitas Bekerja di Sektor Formal",
-    "Produktivitas Industri dan Pertanian", "Pembentukan Modal Tetap Bruto", "Tingkat Pengangguran Terbuka",
-    "Tingkat Partisipasi Angkatan Kerja Perempuan", "Kontribusi Pariwisata terhadap PDRB",
-    "Kontribusi Ekonomi Kreatif terhadap PDRB", "Produktivitas Perkotaan", "Biaya Logistik",
-    "Pembentukan Modal Tetap Bruto terhadap PDRB", "Ekspor Barang dan Jasa", "Kota dan Desa Maju, Inklusif, dan Berkelanjutan",
-    "Indeks Reformasi Hukum", "Indeks Sistem Pemerintahan Berbasis Elektronik", "Indeks Pelayanan Publik",
-    "Indeks Integritas Nasional", "Indeks Pembangunan Hukum", "Rasa Aman di Lingkungan Tempat Tinggal",
-    "Indeks Demokrasi Indonesia", "Rasio Pajak Daerah terhadap PDRB", "Tingkat Inflasi",
-    "Pendalaman dan Intermediasi Sektor Keuangan", "Inklusi Keuangan", "Ketangguhan Diplomasi",
-    "Ketangguhan Pertahanan", "Indeks Pembangunan Kebudayaan", "Indeks Kerukunan Umat Beragama",
-    "Indeks Pembangunan Kualitas Keluarga", "Indeks Ketimpangan Gender", "Indeks Pengelolaan Keanekaragaman Hayati",
-    "Kualitas Lingkungan Hidup", "Ketahanan Energi, Air, dan Pangan", "Indeks Risiko Bencana",
+    "Usia Harapan Hidup",
+    "Kesehatan Ibu dan Anak",
+    "Penanganan Tuberkulosis",
+    "Cakupan Kepesertaan Jaminan Kesehatan Nasional",
+    "Hasil Pembelajaran",
+    "Rata-rata Lama Sekolah",
+    "Harapan Lama Sekolah",
+    "Proporsi Penduduk Berkualifikasi Pendidikan Tinggi",
+    "Pekerja Lulusan Pendidikan Menengah dan Tinggi di Bidang Keahlian Menengah Tinggi",
+    "Tingkat Kemiskinan",
+    "Cakupan Kepesertaan Jaminan Sosial Ketenagakerjaan",
+    "Penyandang Disabilitas Bekerja di Sektor Formal",
+    "Produktivitas Industri dan Pertanian",
+    "Pembentukan Modal Tetap Bruto",
+    "Tingkat Pengangguran Terbuka",
+    "Tingkat Partisipasi Angkatan Kerja Perempuan",
+    "Kontribusi Pariwisata terhadap PDRB",
+    "Kontribusi Ekonomi Kreatif terhadap PDRB",
+    "Produktivitas Perkotaan",
+    "Biaya Logistik",
+    "Pembentukan Modal Tetap Bruto terhadap PDRB",
+    "Ekspor Barang dan Jasa",
+    "Kota dan Desa Maju, Inklusif, dan Berkelanjutan",
+    "Indeks Reformasi Hukum",
+    "Indeks Sistem Pemerintahan Berbasis Elektronik",
+    "Indeks Pelayanan Publik",
+    "Indeks Integritas Nasional",
+    "Indeks Pembangunan Hukum",
+    "Rasa Aman di Lingkungan Tempat Tinggal",
+    "Indeks Demokrasi Indonesia",
+    "Rasio Pajak Daerah terhadap PDRB",
+    "Tingkat Inflasi",
+    "Pendalaman dan Intermediasi Sektor Keuangan",
+    "Inklusi Keuangan",
+    "Ketangguhan Diplomasi",
+    "Ketangguhan Pertahanan",
+    "Indeks Pembangunan Kebudayaan",
+    "Indeks Kerukunan Umat Beragama",
+    "Indeks Pembangunan Kualitas Keluarga",
+    "Indeks Ketimpangan Gender",
+    "Indeks Pengelolaan Keanekaragaman Hayati",
+    "Kualitas Lingkungan Hidup",
+    "Ketahanan Energi, Air, dan Pangan",
+    "Indeks Risiko Bencana",
     "Persentase Penurunan Emisi GRK",
 )
 NAMA_KELOMPOK_BUKU = {
-    "sasaran_visi": NAMA_SASARAN_VISI, "misi_agenda": NAMA_MISI,
-    "arah_ie": NAMA_ARAH, "indikator_induk": NAMA_IUP,
+    "sasaran_visi": NAMA_SASARAN_VISI,
+    "misi_agenda": NAMA_MISI,
+    "arah_ie": NAMA_ARAH,
+    "indikator_induk": NAMA_IUP,
 }
 
 
@@ -84,14 +127,11 @@ def _persentase(terisi: int, total: int) -> float:
     return round(terisi / total * 100, 1) if total else 0
 
 
-def ketersediaan_tahunan(
-    session: Session, tahun_tersedia: list[int], wilayah_kode: str
-) -> list[dict[str, object]]:
+def ketersediaan_tahunan(session: Session, tahun_tersedia: list[int], wilayah_kode: str) -> list[dict[str, object]]:
     """Ketersediaan realisasi per tahun untuk seluruh indikator, ISV, dan IUP."""
     indikator = repo_indikator.daftar_terverifikasi(session)
     menurut_kategori = {
-        kategori: [item.id_indikator for item in indikator if item.kategori == kategori]
-        for kategori in ("ISV", "IUP")
+        kategori: [item.id_indikator for item in indikator if item.kategori == kategori] for kategori in ("ISV", "IUP")
     }
     semua = [item.id_indikator for item in indikator]
     hasil = []

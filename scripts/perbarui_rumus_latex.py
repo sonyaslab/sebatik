@@ -55,9 +55,7 @@ def jalankan(path: Path, *, tulis: bool = True) -> dict[str, int]:
     with SessionLocal() as session:
         baris = {
             m.id_indikator: m
-            for m in session.scalars(
-                select(MetadataIndikator).where(MetadataIndikator.id_indikator.in_(isi))
-            )
+            for m in session.scalars(select(MetadataIndikator).where(MetadataIndikator.id_indikator.in_(isi)))
         }
         hitung["tak_dikenal"] = len(set(isi) - set(baris))
 
