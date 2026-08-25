@@ -1,33 +1,40 @@
-# Varian untuk server yang sudah menjalankan PostgreSQL sendiri: tidak ada
-# service `db` dan `backup` (pencadangan mengikuti kebijakan instance yang
-# sudah ada). Satu-satunya perubahan adalah SEBATIK_DATABASE_URL menunjuk ke
-# instance tersebut.
+# Varian untuk Coolify dengan PostgreSQL eksternal (termasuk PostgreSQL
+# add-on Coolify sendiri): tidak ada service `db` dan `backup`.
 #
-# Menjalankan langsung:
-#   docker compose -f docker-compose.coolify.yml up -d --build
-# Di Coolify: arahkan berkas compose sumber ke berkas ini, atau tempel
-# isinya ke penyusun compose pada UI.
+# Variabel disuntikkan lewat substitusi ${VAR} — cara Coolify meneruskan
+# Environment Variables UI ke compose. Jangan pakai env_file: Coolify tidak
+# selalu menuliskannya sebagai berkas .env yang dibaca env_file, sehingga
+# container diam-diam jatuh ke SQLite bawaan.
+#
+# Isi daftar variabelnya di UI Coolify (lihat .env.coolify.example), lalu
+# Deploy ulang seluruh stack.
 
 services:
   migrasi:
     build: .
-    env_file:
-      - .env
+    environment:
+      - SEBATIK_ENVIRONMENT=${SEBATIK_ENVIRONMENT}
+      - SEBATIK_DATABASE_URL=${SEBATIK_DATABASE_URL}
+      - SEBATIK_SECRET_KEY=${SEBATIK_SECRET_KEY}
+      - SEBATIK_CORS_ORIGINS=${SEBATIK_CORS_ORIGINS}
+      - SEBATIK_SECRET_KEYS=${SEBATIK_SECRET_KEYS}
     command: ["python", "-m", "alembic", "-c", "backend/alembic.ini", "upgrade", "head"]
-    # Tanpa depends_on: basis data eksternal dipakai sebagaimana adanya dan
-    # dianggap sudah berjalan sebelum compose dinyalakan.
-    # host.docker.internal dipetakan ke IP gateway Docker agar container
-    # menjangkau PostgreSQL yang berjalan langsung di host (Linux).
+    # Basis data eksternal dianggap sudah berjalan sebelum compose dinyalakan.
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
   sebatik:
     build: .
     restart: unless-stopped
+    environment:
+      - SEBATIK_ENVIRONMENT=${SEBATIK_ENVIRONMENT}
+      - SEBATIK_DATABASE_URL=${SEBATIK_DATABASE_URL}
+      - SEBATIK_SECRET_KEY=${SEBATIK_SECRET_KEY}
+      - SEBATIK_CORS_ORIGINS=${SEBATIK_CORS_ORIGINS}
+      - SEBATIK_SECRET_KEYS=${SEBATIK_SECRET_KEYS}
+      - FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS}
     ports:
       - "127.0.0.1:8000:8000"
-    env_file:
-      - .env
     volumes:
       - sebatik_data:/app/data/processed
     healthcheck:
