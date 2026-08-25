@@ -43,6 +43,9 @@ ignore_errors = true
 testpaths = ["tests"]
 addopts = "-q"
 filterwarnings = ["ignore::DeprecationWarning"]
+# `src` diimpor sebagai paket (src.etl...) dari backend dan tes; tanpa ini
+# pytest hanya menaruh direktori tes di sys.path, bukan akar proyek.
+pythonpath = ["."]
 
 [tool.ruff.format]
 # Modul lama masih memakai gaya satu-baris padat. Memformat ulang sekarang akan
