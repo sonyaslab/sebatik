@@ -32,8 +32,12 @@ services:
   sebatik:
     build: .
     restart: unless-stopped
+    # Terikat ke localhost: proxy Coolify menjangkau container lewat jaringan
+    # internal Docker, dan binding localhost mencegah akses langsung yang
+    # melewati proxy (dan bisa memalsukan X-Forwarded-For). Ganti/hapus bila
+    # Coolify Anda dikonfigurasi mengharuskan port publik.
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     env_file:
       - .env
     volumes:

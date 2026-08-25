@@ -7,6 +7,9 @@ htmlcov/
 .venv/
 .venv-*/
 .runtime-packages/
+# Lingkungan Python lokal (mis. buatan Codex) tidak boleh masuk repo.
+.codex-py312/
+.codex-*/
 
 # Frontend
 node_modules/

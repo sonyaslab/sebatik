@@ -58,10 +58,12 @@ jobs:
           version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # jsdom 30 menuntut Node >= 22.22; samakan dengan mesin pengembangan.
+          node-version: 22
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
-      - run: pnpm install --no-frozen-lockfile
+      # Lockfile bekuku: resolasi versi yang sudah teruji tidak diganti runner.
+      - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build

@@ -7,7 +7,6 @@ import json
 import sqlite3
 from pathlib import Path
 
-
 KOLOM = {
     "id_indikator": "ID Indikator",
     "definisi": "Definisi (RPJPD Provinsi)",
@@ -36,7 +35,10 @@ def jalankan(master_path: Path, db_path: Path) -> int:
             definisi=?, rumus_mentah=?, interpretasi=?, sumber_data=?, frekuensi=?,
             sumber_metadata='Buku 1 RPJPN-RPJPD 2025-2045', perlu_verifikasi_manual=1
             WHERE id_indikator=?""",
-            [(definisi, rumus, interpretasi, sumber, frekuensi, iid) for iid, definisi, rumus, interpretasi, sumber, frekuensi in baris],
+            [
+                (definisi, rumus, interpretasi, sumber, frekuensi, iid)
+                for iid, definisi, rumus, interpretasi, sumber, frekuensi in baris
+            ],
         )
     return len(baris)
 

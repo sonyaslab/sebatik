@@ -2,6 +2,11 @@
 
 Panduan ini ditujukan bagi pegawai yang terbiasa memakai terminal, tetapi tidak harus memahami pemrograman.
 
+Pemasangan di home server dengan Coolify dan Cloudflare dijelaskan terpisah di
+[deploy-coolify-cloudflare.md](deploy-coolify-cloudflare.md); pemasangan di
+server internal tanpa domain ada di
+[deploy-server-internal.md](deploy-server-internal.md).
+
 ## Pemasangan lokal
 
 1. Pasang Python 3.11 atau lebih baru dan Node.js 20 atau lebih baru. Skrip memakai pnpm jika tersedia, atau npm sebagai fallback.

@@ -144,3 +144,27 @@ Alembic, pemisahan router/service/repository, ETL data-driven, pemecahan
 keputusan dan temuan yang berbeda dari rencana dicatat di
 `docs/refactoring/CATATAN-PELAKSANAAN.md`. Baca berkas itu lebih dulu sebelum
 melakukan perubahan struktural besar.
+
+<!-- SKILL-ROUTING:START -->
+## Skills
+
+Skill khusus repo ini ada di `.claude/skills/` dan otomatis terbaca Claude Code
+maupun OpenCode saat sesi dibuka dari root repo ini. Skill metodologi (Superpowers,
+`documentation-lookup`, dll.) global — tidak diulang di sini.
+
+| Skill | Pakai untuk |
+|---|---|
+| `api-design` | Desain REST: penamaan resource, status code, pagination, filtering, versioning |
+| `backend-patterns` | Arsitektur backend, optimasi database, pola sisi server |
+| `fastapi` | Pola FastAPI: Pydantic, dependency, streaming/SSE, serve frontend |
+
+### Skill di subfolder
+
+Baru aktif kalau sesi dibuka **dari folder itu**, bukan dari root repo.
+Sesi di subfolder tetap ikut melihat skill root — Claude Code dan OpenCode
+menelusuri ke atas sampai root repo, jadi daftarnya bertambah, bukan berganti:
+
+| Folder | Skill tambahan |
+|---|---|
+| `frontend/` | `impeccable`, `vercel-react-best-practices` |
+<!-- SKILL-ROUTING:END -->

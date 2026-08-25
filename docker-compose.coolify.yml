@@ -1,0 +1,45 @@
+# Varian untuk server yang sudah menjalankan PostgreSQL sendiri: tidak ada
+# service `db` dan `backup` (pencadangan mengikuti kebijakan instance yang
+# sudah ada). Satu-satunya perubahan adalah SEBATIK_DATABASE_URL menunjuk ke
+# instance tersebut.
+#
+# Menjalankan langsung:
+#   docker compose -f docker-compose.coolify.yml up -d --build
+# Di Coolify: arahkan berkas compose sumber ke berkas ini, atau tempel
+# isinya ke penyusun compose pada UI.
+
+services:
+  migrasi:
+    build: .
+    env_file:
+      - .env
+    command: ["python", "-m", "alembic", "-c", "backend/alembic.ini", "upgrade", "head"]
+    # Tanpa depends_on: basis data eksternal dipakai sebagaimana adanya dan
+    # dianggap sudah berjalan sebelum compose dinyalakan.
+    # host.docker.internal dipetakan ke IP gateway Docker agar container
+    # menjangkau PostgreSQL yang berjalan langsung di host (Linux).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  sebatik:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - sebatik_data:/app/data/processed
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      migrasi:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  sebatik_data:
