@@ -27,6 +27,7 @@ tmp/
 # (nama PIC). Sumber kebenarannya ada di berbagi pakai kantor, bukan di git.
 data/raw/
 data/processed/*.db
+data/processed/sebatik-database.json
 data/processed/cadangan/
 data/processed/arsip-unggahan/
 data/processed/bukti-dukung/

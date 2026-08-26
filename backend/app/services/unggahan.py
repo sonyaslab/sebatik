@@ -1,37 +1,23 @@
-"""Unggahan Excel massal: staging, diff, dan penerapan setelah disetujui.
+"""Unggahan dataset database: validasi, diff, dan penerapan setelah disetujui.
 
-Alurnya sengaja dua langkah. Berkas yang diunggah dijalankan lewat pipeline ETL
-ke basis data staging terpisah, hasilnya dibandingkan dengan data berjalan, dan
-baru diterapkan setelah admin menyetujui diff-nya.
+Alurnya sengaja dua langkah. Transformasi sumber dilakukan di luar proses API;
+server hanya memvalidasi dataset, membandingkannya, lalu memuat setelah disetujui.
 """
 
 from __future__ import annotations
 
 import json
-import sqlite3
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from openpyxl import load_workbook
 from sqlalchemy.orm import Session
 
 from ..config import settings
-from ..models import KODE_PROVINSI, JenisNilai, StatusUnggahan, StatusVerifikasi
+from ..models import KODE_PROVINSI, StatusUnggahan
 from ..repositories import nilai as repo_nilai
 from ..repositories import tata_kelola as repo_tata_kelola
-
-
-def sheet_wajib() -> frozenset[str]:
-    """Sheet yang harus ada agar pipeline ETL dapat berjalan.
-
-    Diambil dari konfigurasi ETL, bukan disalin, supaya daftar ini tidak
-    menyimpang ketika versi workbook berganti.
-    """
-    from src.etl.config import bawaan
-
-    return frozenset(bawaan().sheet_wajib)
 
 
 class BerkasTidakValid(Exception):
@@ -44,8 +30,8 @@ class HasilPratinjau(NamedTuple):
     diff: dict[str, Any]
 
 
-def berekstensi_xlsx(nama_berkas: str | None) -> bool:
-    return bool(nama_berkas) and str(nama_berkas).lower().endswith(".xlsx")
+def berekstensi_database(nama_berkas: str | None) -> bool:
+    return bool(nama_berkas) and str(nama_berkas).lower().endswith(".json")
 
 
 def ukuran_wajar(jumlah_byte: int) -> bool:
@@ -55,41 +41,33 @@ def ukuran_wajar(jumlah_byte: int) -> bool:
 def arsipkan(isi: bytes) -> Path:
     direktori = Path(settings.archive_dir)
     direktori.mkdir(parents=True, exist_ok=True)
-    berkas = direktori / f"{datetime.now(UTC):%Y%m%d-%H%M%S}-{uuid.uuid4()}.xlsx"
+    berkas = direktori / f"{datetime.now(UTC):%Y%m%d-%H%M%S}-{uuid.uuid4()}.database.json"
     berkas.write_bytes(isi)
     return berkas
 
 
-def periksa_sheet(path: Path) -> None:
-    workbook = load_workbook(path, read_only=True)
-    try:
-        hilang = sheet_wajib() - set(workbook.sheetnames)
-    finally:
-        workbook.close()
-    if hilang:
-        raise BerkasTidakValid(f"Sheet hilang: {', '.join(sorted(hilang))}")
+def _baca_dataset(path: Path) -> tuple[dict[str, str], dict[tuple[str, int, str], float | None]]:
+    from src.etl.database import DatasetTidakValid, baca_dataset
 
-
-def _baca_staging(path: Path) -> tuple[dict[str, str], dict[tuple[str, int, str], float | None]]:
-    koneksi = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     try:
-        indikator = {
-            baris[0]: baris[1] for baris in koneksi.execute("SELECT id_indikator,nama_indikator FROM indikator")
-        }
-        nilai = {
-            (baris[0], baris[1], baris[2]): baris[3]
-            for baris in koneksi.execute("SELECT id_indikator,tahun,jenis,nilai FROM nilai_indikator")
-        }
-    finally:
-        koneksi.close()
+        dataset = baca_dataset(path)
+    except DatasetTidakValid as exc:
+        raise BerkasTidakValid(str(exc)) from exc
+    data = dataset["data"]
+    indikator = {baris["id_indikator"]: baris["nama_indikator"] for baris in data["indikator"]}
+    nilai = {
+        (baris["id_indikator"], baris["tahun"], baris["jenis"]): baris["nilai"]
+        for baris in data["nilai_indikator"]
+        if baris.get("wilayah_kode") == KODE_PROVINSI and baris.get("periode") is None
+    }
     return indikator, nilai
 
 
 def susun_diff(
     session: Session, path_staging: Path
 ) -> tuple[dict[str, Any], dict[tuple[str, int, str], tuple[float | None, str | None]]]:
-    """Bandingkan hasil ETL staging dengan nilai provinsi yang berlaku."""
-    indikator_baru, nilai_baru = _baca_staging(path_staging)
+    """Bandingkan dataset database dengan nilai provinsi yang berlaku."""
+    indikator_baru, nilai_baru = _baca_dataset(path_staging)
     indikator_lama = {item.id_indikator: item.nama_indikator for item in repo_nilai.semua_indikator_ringkas(session)}
     nilai_lama = {
         (baris.id_indikator, baris.tahun, baris.jenis): baris.nilai
@@ -114,36 +92,24 @@ def susun_diff(
 
 
 def terapkan(session: Session, unggahan: Any, pengguna_id: int | None) -> int:
-    """Tulis nilai dari staging ke tabel fakta; kembalikan jumlah perubahan.
-
-    Hanya indikator yang sudah dikenal yang disentuh: unggahan tidak boleh
-    diam-diam membuat dimensi indikator baru.
-    """
-    path_staging = Path(unggahan.path_arsip).with_suffix(".stage.db")
+    """Muat dimensi, metadata, dan fakta dari dataset dalam transaksi persetujuan."""
+    path_staging = Path(unggahan.path_arsip)
     if not path_staging.exists():
-        raise BerkasTidakValid("Database staging tidak ditemukan")
+        raise BerkasTidakValid("Dataset database tidak ditemukan")
 
-    _, nilai_baru = _baca_staging(path_staging)
-    dikenal = {item.id_indikator for item in repo_nilai.semua_indikator_ringkas(session)}
-    jumlah = 0
+    from src.etl.database import baca_dataset, muat_dataset
+
+    dataset = baca_dataset(path_staging)
+    _, nilai_baru = _baca_dataset(path_staging)
+    nilai_lama = {
+        (baris.id_indikator, baris.tahun, baris.jenis): baris.nilai
+        for baris in repo_nilai.semua_nilai_provinsi(session)
+    }
+    hasil = muat_dataset(session, dataset)
     for (id_indikator, tahun, jenis), nilai in nilai_baru.items():
-        if id_indikator not in dikenal or jenis not in tuple(JenisNilai):
+        lama = nilai_lama.get((id_indikator, tahun, jenis))
+        if lama == nilai:
             continue
-        baris_lama = repo_nilai.ambil(session, id_indikator, KODE_PROVINSI, tahun, jenis)
-        if baris_lama is not None and baris_lama.nilai == nilai:
-            continue
-        _, lama = repo_nilai.upsert(
-            session,
-            id_indikator=id_indikator,
-            wilayah_kode=KODE_PROVINSI,
-            tahun=tahun,
-            jenis=jenis,
-            nilai=nilai,
-            nilai_teks=baris_lama.nilai_teks if baris_lama else None,
-            satuan_catatan=baris_lama.satuan_catatan if baris_lama else None,
-            sumber=unggahan.nama_file_asli,
-            status_verifikasi=StatusVerifikasi.DISETUJUI,
-        )
         repo_tata_kelola.catat_perubahan(
             session,
             pengguna_id=pengguna_id,
@@ -154,11 +120,10 @@ def terapkan(session: Session, unggahan: Any, pengguna_id: int | None) -> int:
             sumber_perubahan="unggah",
             referensi_id=str(unggahan.id),
         )
-        jumlah += 1
 
     unggahan.status = StatusUnggahan.DISETUJUI
     unggahan.disetujui_pada = datetime.now(UTC)
-    return jumlah
+    return hasil["nilai_indikator"]
 
 
 def ringkasan_diff_json(diff: dict[str, Any]) -> str:

@@ -26,6 +26,15 @@ menghasilkan 172 baris, bukan 86.
 **Keputusan (pemilik produk, 19 Agustus 2026):** daftar **master** yang dipakai;
 jalur ETL dibuang. Dimensi `indikator` berisi 86 baris dari `beranda_indikator`.
 
+### Tindak lanjut dataset database (26 Agustus 2026)
+
+Loader produksi tidak lagi menerima workbook/PDF atau SQLite staging dari jalur
+ID dua digit. Excel/PDF berhenti di zona sumber dan hasil klasifikasi diekspor
+lebih dulu. `scripts/kelola_database.py` mengubah ekspor itu menjadi dataset JSON
+`sebatik.database/v1` yang memakai master tiga digit, lalu loader memuat dimensi,
+metadata, dan fakta ke PostgreSQL dalam satu transaksi. Unggahan admin hanya
+menerima dataset database yang checksum dan manifest-nya valid.
+
 ### Konsekuensi yang harus ditindaklanjuti
 
 1. **`arah_baik` hilang untuk 63 indikator.** Kolom ini hanya ada di jalur ETL

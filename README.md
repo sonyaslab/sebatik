@@ -63,20 +63,31 @@ Tarakan. Perintah seed menyiapkan dua akun operator per wilayah dengan pola `ope
 
 ## Memperbarui data
 
-```powershell
-python -m src.etl.audit data/raw/ISV-IUP_Provinsi_Kalimantan_Utara.xlsx
-python -m src.etl.pipeline data/raw/ISV-IUP_Provinsi_Kalimantan_Utara.xlsx
-python -m src.etl.metadata_pdf data/raw/BUKU_1_RPJPN_RPJPD_2025-2045.pdf
-```
-
-Urutan tersebut penting karena tahap metadata mengisi tabel yang dibuat ulang oleh tahap pipeline. Berkas sumber tidak dimodifikasi.
-
-Pemetaan sheet, kolom, dan tahun berada di `src/etl/config/workbook.yaml`.
-Versi workbook baru cukup ditangani dengan mengubah berkas itu:
+Produksi tidak membaca Excel atau PDF secara langsung. Sumber yang telah
+diklasifikasikan ditransformasi menjadi dataset JSON terstandar berversi, melewati
+gerbang validasi, lalu dimuat ke PostgreSQL dalam satu transaksi.
 
 ```powershell
-python -m src.etl.pipeline berkas-baru.xlsx --config src/etl/config/workbook-2030.yaml
+# Zona transformasi — tidak mengakses database produksi
+python -m scripts.kelola_database transformasi `
+  data/raw/basis_data_indikator_isv_iup_kaltara.json `
+  data/processed/sebatik-database.json
+
+# Gerbang mutu — wajib lulus sebelum persetujuan
+python -m scripts.kelola_database validasi data/processed/sebatik-database.json
+
+# Bootstrap/cutover langsung ke SEBATIK_DATABASE_URL
+python -m scripts.kelola_database muat data/processed/sebatik-database.json
 ```
+
+Untuk operasi rutin, admin mengunggah dataset database `.json`, memeriksa diff, lalu
+menyetujuinya. Dataset mewajibkan tepat 86 ID master tiga digit, manifest jumlah
+baris, integritas referensial, dan checksum SHA-256. Excel/PDF hanya boleh
+dipakai oleh proses hulu untuk menghasilkan JSON sumber terklasifikasi.
+
+Prosedur lengkap pengembangan, pull request, deployment, backup, pemuatan
+PostgreSQL, verifikasi, dan rollback tersedia di
+`docs/11-prosedur-etl-database.md`.
 
 ## Pengujian
 
