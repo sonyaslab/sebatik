@@ -114,31 +114,63 @@ nilainya kadang beda representasi.
 | — | `usulan_id = NULL`, `status_verifikasi = DISETUJUI` (default model) |
 | — | `sumber = "seed_awal:BASIS_DATA_INDIKATOR_ISV-IUP_KALTARA.xlsx"` (jejak provenance) |
 
-### Mekanisme
+### Mekanisme (revisi — bukan migrasi Alembic)
+
+**Ditemukan saat penulisan plan**: mekanisme awal (migrasi data Alembic,
+pola `0002_seed_wilayah.py`) akan menabrak test suite. `tests/api/conftest.py`
+membangun skema tes dengan `alembic upgrade head` — command yang sama dengan
+produksi — lalu `_isi_benih()` di berkas yang sama insert baris
+`Indikator(id_indikator="ISV-001", ...)`, `"ISV-002"`, `"IUP-001"`, dst
+sebagai fixture tes buatan tangan. ID itu **bertabrakan** dengan ID indikator
+produksi asli. Kalau seed jadi migrasi Alembic, migrasi insert `ISV-001`
+duluan, lalu `_isi_benih()` coba insert `"ISV-001"` lagi → `IntegrityError`
+(PK bentrok) → seluruh test suite `tests/api/` gagal. Beda dari kasus
+wilayah: `_isi_benih()` tidak pernah insert ulang kode wilayah yang sama,
+cuma reuse `"65"`/`"6501"` yang sudah ada dari migrasi 0002.
+
+Karena itu mekanismenya **bukan** migrasi Alembic, tapi **perintah CLI
+idempoten** yang dipanggil eksplisit dari `docker-entrypoint.sh`, terpisah
+dari `alembic upgrade head`:
 
 1. **Skrip ekspor** baru: `scripts/ekspor_seed_indikator.py`. Baca dua sheet
    di atas dari `data/raw/BASIS_DATA_INDIKATOR_ISV-IUP_KALTARA.xlsx`
    memakai mapping di atas, hasilnya ditulis ke
-   `backend/alembic/data/indikator_seed.json` (struktur:
+   `backend/app/data/indikator_seed.json` (struktur:
    `{"indikator": [...], "metadata_indikator": [...], "nilai_indikator": [...]}`).
    File JSON ini **di-commit ke git** — bukan Excel-nya (tetap ikuti aturan
    `data/raw/` tidak ter-commit).
-2. **Migrasi Alembic baru** `backend/alembic/versions/0004_seed_indikator.py`,
-   pola identik `0002_seed_wilayah.py`: baca `indikator_seed.json` saat
-   `upgrade()`, `op.bulk_insert()` ke tiga tabel berurutan (`indikator` →
-   `metadata_indikator` → `nilai_indikator`, sesuai urutan FK).
-   `downgrade()` hapus baris-baris itu by `id_indikator` (nilai dan metadata
-   ikut terhapus lewat filter FK yang sama).
-3. **Tidak ada perubahan** di `docker-entrypoint.sh` atau `cli.py` — migrasi
-   ini otomatis kebawa oleh `alembic upgrade head` yang sudah jalan di
-   entrypoint. Idempoten native: migrasi tercatat di `alembic_version`,
-   sekali jalan per instalasi, redeploy = no-op.
+2. **Subcommand CLI baru** `python -m backend.app.cli seed-indikator` di
+   `backend/app/cli.py` (berdampingan dengan `seed`/`periksa` yang sudah
+   ada): cek `SELECT COUNT(*) FROM indikator` lewat repository; kalau `> 0`
+   — cetak pesan "sudah terisi, dilewati" dan keluar tanpa melakukan apa-apa;
+   kalau `0` — baca `indikator_seed.json`, insert ke tiga tabel berurutan
+   (`indikator` → `metadata_indikator` → `nilai_indikator`, sesuai urutan
+   FK) dalam satu transaksi, commit, cetak ringkasan jumlah baris.
+3. **`docker-entrypoint.sh` diubah**: tambah satu baris
+   `python -m backend.app.cli seed-indikator` setelah loop retry
+   `alembic upgrade head` berhasil, sebelum `exec "$@"`. Tidak perlu logic
+   retry di langkah ini (DB sudah pasti reachable di titik ini, filenya
+   sudah baked di image) — kalau gagal, biarkan `set -e` menghentikan
+   entrypoint supaya kegagalan terlihat jelas di log deploy.
+4. **Idempotensi** dijamin oleh cek `COUNT(*)` eksplisit di langkah 2, bukan
+   oleh mekanisme revisi Alembic. Tetap memenuhi syarat "isi otomatis saat
+   kosong, jangan isi ulang saat redeploy". Tidak ada migrasi baru sama
+   sekali — skema `indikator`/`metadata_indikator`/`nilai_indikator` sudah
+   ada dari `0001_baseline`, tidak berubah.
+5. **Test suite tidak terpengaruh**: `_bangun_skema()` di conftest cuma
+   menjalankan `alembic upgrade head` (tidak ada migrasi baru dari kita),
+   dan tidak pernah memanggil `cli.py seed-indikator`, jadi `_isi_benih()`
+   tetap insert fixture buatan tangannya sendiri tanpa tabrakan PK.
 
 ### File yang dibuat/diubah (Bagian A)
 
 - `scripts/ekspor_seed_indikator.py` (baru)
-- `backend/alembic/data/indikator_seed.json` (baru, di-generate lalu commit)
-- `backend/alembic/versions/0004_seed_indikator.py` (baru)
+- `backend/app/data/indikator_seed.json` (baru, di-generate lalu commit)
+- `backend/app/cli.py` (tambah subcommand `seed-indikator` + fungsi
+  `perintah_seed_indikator()`)
+- `backend/app/repositories/indikator.py` (tambah `jumlah()` — hitung baris
+  tabel `indikator`, dipakai cek idempotensi)
+- `docker-entrypoint.sh` (tambah satu baris pemanggilan CLI baru)
 
 ## Bagian B — Admin CRUD manajemen indikator
 
@@ -239,14 +271,18 @@ Dari `metadata_indikator`: `definisi`, `interpretasi`, `sumber_data`,
   (endpoint publik tidak disentuh). Tes baru: kontrak CRUD admin (create
   sukses, id tidak konsisten → 422, duplikat → 409, delete diblokir kalau
   ada nilai, log audit tercatat).
-- Migrasi: `alembic upgrade head` lalu `downgrade -1` terhadap PostgreSQL
-  asli (CI sudah melakukan ini) harus bersih dua arah.
+- Migrasi: tidak ada migrasi baru di Bagian A (revisi), jadi tidak ada
+  `upgrade`/`downgrade` tambahan yang perlu diuji di luar yang sudah ada.
 - Frontend: `pnpm test` utk `IndikatorManager.jsx`, `pnpm lint`, `pnpm build`.
 - Manual: jalankan `scripts/ekspor_seed_indikator.py` dari Excel yang sudah
   ditaruh, cek `indikator_seed.json` masuk akal (86 indikator, 660 nilai),
-  `alembic upgrade head` di DB kosong → cek 86 baris `indikator` + nilai
-  provinsi ke-load, ulangi `alembic upgrade head` → no-op (revisi sudah
-  diterapkan).
+  jalankan `python -m backend.app.cli seed-indikator` di DB kosong → cek 86
+  baris `indikator` + nilai provinsi ke-load, jalankan ulang perintah yang
+  sama → cetak "sudah terisi, dilewati" dan tidak menambah baris (idempoten).
+- Regresi: jalankan `python -m pytest tests/api/` penuh setelah subcommand
+  CLI ditambahkan, pastikan tidak ada perubahan hasil dibanding sebelum
+  Bagian A dikerjakan (memverifikasi tidak ada tabrakan PK dengan fixture
+  `_isi_benih()`).
 
 ## Di luar cakupan
 
