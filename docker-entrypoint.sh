@@ -20,6 +20,13 @@ except Exception as e:
     print(f"[entrypoint] SEBATIK_DATABASE_URL TIDAK VALID: {e}")
     print("[entrypoint] periksa: prefix postgresql+psycopg:// ; sandi ter-encode")
     print("[entrypoint] (%40 untuk @, %3A untuk :, %25 untuk %) ; tanpa tanda kutip.")
+    # Tampilkan bentuk mentah yang diterima container (sandi disamarkan):
+    # spasi/newline senyap hasil salin-tempel terlihat di sini.
+    if url:
+        tampil = url.split(":", 1)[0] + ":***@" + (url.rsplit("@", 1)[1] if "@" in url else "?")
+        print(f"[entrypoint] repr mentah (panjang {len(url)}): {tampil!r}")
+    else:
+        print("[entrypoint] nilai kosong / variabel tidak sampai ke container")
     raise SystemExit(1)
 PY
 
