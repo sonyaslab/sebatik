@@ -6,6 +6,23 @@ set -e
 
 cd /app
 
+# Galat format URL tidak akan sembuh dengan diulang; periksa sekali di awal
+# supaya pesannya jelas dan sandi tetap tersamar, bukan 10 percobaan sia-sia.
+python - <<'PY' || exit 1
+import os
+from sqlalchemy.engine import make_url
+
+url = os.environ.get("SEBATIK_DATABASE_URL", "")
+try:
+    u = make_url(url)
+    print(f"[entrypoint] URL valid: {u.drivername} -> {u.host}:{u.port}/{u.database}")
+except Exception as e:
+    print(f"[entrypoint] SEBATIK_DATABASE_URL TIDAK VALID: {e}")
+    print("[entrypoint] periksa: prefix postgresql+psycopg:// ; sandi ter-encode")
+    print("[entrypoint] (%40 untuk @, %3A untuk :, %25 untuk %) ; tanpa tanda kutip.")
+    raise SystemExit(1)
+PY
+
 # Basis data bisa belum terjangkau detik pertama container menyala (race
 # startup di Coolify/compose). Coba berkali-kali sebelum menyerah.
 attempts=10
