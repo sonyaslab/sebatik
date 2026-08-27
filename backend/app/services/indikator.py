@@ -11,10 +11,12 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from ..models import KODE_PROVINSI, ArahBaik, Indikator
+from ..models import KODE_PROVINSI, ArahBaik, Indikator, MetadataIndikator
 from ..repositories import indikator as repo_indikator
 from ..repositories import nilai as repo_nilai
 from ..repositories import tata_kelola as repo_tata_kelola
+from ..schemas.indikator import IndikatorFormBuat, IndikatorFormDasar
+from . import Penolakan
 from . import capaian as svc_capaian
 
 # Kolom yang boleh keluar lewat daftar publik. Nama PIC perorangan dan status
@@ -194,3 +196,261 @@ def koreksi_arah_baik(
     )
     session.commit()
     return {"status": "ok", "id_indikator": indikator.id_indikator, "arah_baik": arah_baik}
+
+
+# --- CRUD admin -------------------------------------------------------------
+#
+# Field indikator yang boleh diisi/diedit lewat form admin. `arah_baik` dan
+# `arah_baik_terverifikasi` sengaja TIDAK di sini — itu tetap lewat
+# koreksi_arah_baik()/endpoint /arah-baik/{id} yang sudah ada, supaya tidak
+# ada dua jalur yang menulis field yang sama. `status_verifikasi` juga tidak
+# di sini — selalu DISETUJUI untuk data yang ditulis admin.
+FIELD_INDIKATOR_EDITABLE = (
+    "kategori",
+    "nomor",
+    "kode_indikator",
+    "nama_indikator",
+    "nama_asli",
+    "kelompok",
+    "arah_pembangunan",
+    "sasaran_visi",
+    "misi_agenda",
+    "arah_ie",
+    "indikator_induk",
+    "kelompok_makro",
+    "satuan",
+    "penghasil",
+    "kl_pengampu",
+    "opd_pengampu",
+    "tim_pjk",
+    "sumber_data",
+    "frekuensi",
+    "status_ketersediaan",
+    "status_metadata",
+    "periode_data",
+    "tahun_terakhir",
+    "is_proxy",
+    "nama_proxy",
+    "status_rpjmd",
+    "kode_sdgs",
+    "link_metadata",
+    "link_publikasi",
+    "link_data",
+    "catatan_teknis",
+)
+# Field metadata_indikator yang boleh diedit. sumber_data/frekuensi/
+# status_metadata sengaja SAMA NAMA dengan tiga field indikator di atas —
+# _pisahkan_field() menyalin nilai form yang sama ke dua tabel itu.
+FIELD_METADATA_EDITABLE = (
+    "definisi",
+    "interpretasi",
+    "sumber_data",
+    "frekuensi",
+    "rumus",
+    "rumus_mentah",
+    "rumus_latex",
+    "halaman_sumber",
+    "perlu_verifikasi_manual",
+    "sumber_metadata",
+    "nama_di_buku1",
+    "status_metadata",
+)
+
+
+def _kosong_jadi_none(nilai: Any) -> Any:
+    """String kosong dari form berarti kosongkan field, bukan literal string kosong."""
+    if isinstance(nilai, str) and nilai.strip() == "":
+        return None
+    return nilai
+
+
+def _pisahkan_field(form: IndikatorFormDasar) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Form gabungan -> (field utk tabel indikator, field utk metadata_indikator)."""
+    muatan = form.model_dump()
+    indikator_fields = {f: _kosong_jadi_none(muatan[f]) for f in FIELD_INDIKATOR_EDITABLE}
+    metadata_fields = {f: _kosong_jadi_none(muatan[f]) for f in FIELD_METADATA_EDITABLE}
+    return indikator_fields, metadata_fields
+
+
+def periksa_konsistensi_id(id_indikator: str, kategori: str, nomor: int) -> Penolakan | None:
+    """`id_indikator` harus selalu `kategori-nomor` 3 digit; dicek di create DAN update.
+
+    Dipanggil dengan id_indikator dari form saat create, dan dari path saat
+    update (lihat backend/app/routers/admin.py) — supaya submit yang mencoba
+    mengubah kategori/nomor jadi tidak konsisten dengan id_indikator yang
+    sudah ada (primary key, tidak pernah berubah) ditolak.
+    """
+    if kategori not in ("ISV", "IUP"):
+        return Penolakan(422, "Kategori harus ISV atau IUP")
+    diharapkan = f"{kategori}-{nomor:03d}"
+    if id_indikator != diharapkan:
+        return Penolakan(
+            422,
+            f"id_indikator harus konsisten dengan kategori+nomor (diharapkan {diharapkan}, dapat {id_indikator})",
+        )
+    return None
+
+
+def periksa_penghapusan(session: Session, id_indikator: str) -> Penolakan | None:
+    if repo_indikator.punya_nilai(session, id_indikator):
+        return Penolakan(409, "Indikator masih punya histori nilai; tidak dapat dihapus")
+    return None
+
+
+def buat_indikator(session: Session, form: IndikatorFormBuat, *, pengguna_id: int | None) -> Indikator:
+    indikator_fields, metadata_fields = _pisahkan_field(form)
+    indikator_fields["id_indikator"] = form.id_indikator
+    indikator = repo_indikator.buat(session, indikator_fields, metadata_fields)
+    repo_tata_kelola.catat_aktivitas(
+        session,
+        pengguna_id=pengguna_id,
+        aksi="indikator_dibuat",
+        objek_tipe="indikator",
+        objek_id=indikator.id_indikator,
+        detail=None,
+    )
+    session.commit()
+    return indikator
+
+
+def perbarui_indikator(
+    session: Session,
+    indikator: Indikator,
+    metadata: MetadataIndikator | None,
+    form: IndikatorFormDasar,
+    *,
+    pengguna_id: int | None,
+) -> dict[str, Any]:
+    indikator_fields, metadata_fields = _pisahkan_field(form)
+    perubahan = repo_indikator.perbarui(session, indikator, metadata, indikator_fields, metadata_fields)
+    for field, (lama, baru) in perubahan.items():
+        repo_tata_kelola.catat_perubahan(
+            session,
+            pengguna_id=pengguna_id,
+            id_indikator=indikator.id_indikator,
+            field=field,
+            nilai_lama=str(lama) if lama is not None else None,
+            nilai_baru=str(baru) if baru is not None else None,
+            sumber_perubahan="edit_admin",
+        )
+    session.commit()
+    return {"status": "DIPERBARUI"}
+
+
+def hapus_indikator(session: Session, indikator: Indikator, *, pengguna_id: int | None) -> dict[str, str]:
+    id_indikator = indikator.id_indikator
+    repo_tata_kelola.catat_aktivitas(
+        session,
+        pengguna_id=pengguna_id,
+        aksi="indikator_dihapus",
+        objek_tipe="indikator",
+        objek_id=id_indikator,
+        detail={"nama_indikator": indikator.nama_indikator, "kategori": indikator.kategori},
+    )
+    repo_indikator.hapus(session, indikator)
+    session.commit()
+    return {"status": "DIHAPUS"}
+
+
+def _ringkas_admin(indikator: Indikator, punya_nilai: bool) -> dict[str, Any]:
+    """Satu baris daftar/detail admin: seluruh kolom indikator, bukan FIELD_PUBLIK.
+
+    Sengaja terpisah dari `ringkas()` di atas — yang publik menyembunyikan
+    kolom internal (catatan_teknis, link_metadata, status_rpjmd) yang tidak
+    boleh bocor ke endpoint publik `/indikator`.
+    """
+    return {
+        "id_indikator": indikator.id_indikator,
+        "kategori": indikator.kategori,
+        "nomor": indikator.nomor,
+        "kode_indikator": indikator.kode_indikator,
+        "nama_indikator": indikator.nama_indikator,
+        "nama_asli": indikator.nama_asli,
+        "kelompok": indikator.kelompok,
+        "arah_pembangunan": indikator.arah_pembangunan,
+        "sasaran_visi": indikator.sasaran_visi,
+        "misi_agenda": indikator.misi_agenda,
+        "arah_ie": indikator.arah_ie,
+        "indikator_induk": indikator.indikator_induk,
+        "kelompok_makro": indikator.kelompok_makro,
+        "satuan": indikator.satuan,
+        "penghasil": indikator.penghasil,
+        "kl_pengampu": indikator.kl_pengampu,
+        "opd_pengampu": indikator.opd_pengampu,
+        "tim_pjk": indikator.tim_pjk,
+        "sumber_data": indikator.sumber_data,
+        "frekuensi": indikator.frekuensi,
+        "status_ketersediaan": indikator.status_ketersediaan,
+        "status_metadata": indikator.status_metadata,
+        "periode_data": indikator.periode_data,
+        "tahun_terakhir": indikator.tahun_terakhir,
+        "is_proxy": indikator.is_proxy,
+        "nama_proxy": indikator.nama_proxy,
+        "status_rpjmd": indikator.status_rpjmd,
+        "arah_baik": indikator.arah_baik,
+        "arah_baik_terverifikasi": indikator.arah_baik_terverifikasi,
+        "kode_sdgs": indikator.kode_sdgs,
+        "link_metadata": indikator.link_metadata,
+        "link_publikasi": indikator.link_publikasi,
+        "link_data": indikator.link_data,
+        "catatan_teknis": indikator.catatan_teknis,
+        "punya_nilai": punya_nilai,
+    }
+
+
+def daftar_admin(
+    session: Session,
+    *,
+    q: str | None,
+    kategori: list[str] | None,
+    kelompok: list[str] | None,
+    tim: list[str] | None,
+    sort: str,
+    order: str,
+    page: int,
+    page_size: int,
+) -> dict[str, Any]:
+    """Daftar admin berhalaman — semua kolom indikator, bukan hanya FIELD_PUBLIK."""
+    daftar, total = repo_indikator.cari(
+        session,
+        q=q,
+        kategori=kategori,
+        kelompok=kelompok,
+        tim=tim,
+        status_metadata=None,
+        sort=sort,
+        order=order,
+        page=page,
+        page_size=page_size,
+    )
+    dengan_nilai = repo_indikator.id_dengan_nilai(session, [item.id_indikator for item in daftar])
+    return {
+        "data": [_ringkas_admin(item, item.id_indikator in dengan_nilai) for item in daftar],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+def detail_admin(session: Session, indikator: Indikator) -> dict[str, Any]:
+    metadata = repo_indikator.ambil_metadata(session, indikator.id_indikator)
+    hasil = _ringkas_admin(indikator, repo_indikator.punya_nilai(session, indikator.id_indikator))
+    hasil["metadata"] = (
+        None
+        if metadata is None
+        else {
+            "definisi": metadata.definisi,
+            "interpretasi": metadata.interpretasi,
+            "sumber_data": metadata.sumber_data,
+            "frekuensi": metadata.frekuensi,
+            "rumus": metadata.rumus,
+            "rumus_mentah": metadata.rumus_mentah,
+            "rumus_latex": metadata.rumus_latex,
+            "halaman_sumber": metadata.halaman_sumber,
+            "perlu_verifikasi_manual": metadata.perlu_verifikasi_manual,
+            "sumber_metadata": metadata.sumber_metadata,
+            "nama_di_buku1": metadata.nama_di_buku1,
+            "status_metadata": metadata.status_metadata,
+        }
+    )
+    return hasil
