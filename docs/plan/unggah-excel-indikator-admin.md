@@ -1,6 +1,14 @@
 # Rencana: Unggah Excel Indikator oleh Admin
 
-Status: **rencana, belum dieksekusi**
+Status: **sudah dieksekusi** (lihat CHANGELOG "Unggah Excel indikator oleh admin")
+
+Catatan pelaksanaan: §3 menyatakan tidak ada logika pemetaan baru yang perlu
+ditulis karena nama sheet dan kolomnya sama persis dengan yang sudah dibaca
+`transformasi_sumber_database()`. Itu benar untuk nama kolom, tetapi fungsi
+tersebut menggabungkan kedua sheet lewat `ID Indikator` — dan penomoran IUP
+kedua sheet berbeda, sehingga nilai menempel ke indikator yang salah. Kunci
+gabung diperbaiki menjadi `(Kategori, Kode Indikator)` saat eksekusi; tanpa
+itu kriteria idempoten di §8 langkah 4 tidak pernah terpenuhi.
 Sumber data acuan: `data/raw/BASIS_DATA_INDIKATOR_ISV-IUP_KALTARA.xlsx`
 
 ---

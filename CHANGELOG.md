@@ -2,6 +2,21 @@
 
 ## Belum Dirilis
 
+### Unggah Excel indikator oleh admin
+
+- Admin dapat mengunggah berkas `.xlsx` basis data indikator langsung dari
+  halaman admin, memeriksa pratinjau perubahan, lalu menyetujuinya tanpa
+  menyentuh terminal. Gerbang HTTP hanya menerima `.xlsx`; jalur JSON tetap
+  tersedia di CLI untuk deployment container dan CI, yang kini juga punya
+  subperintah `kelola_database excel`.
+- Nilai hasil alur verifikasi operator -> verifikator dilindungi: unggahan
+  massal tidak pernah menimpanya, dan baris seperti itu tampil terpisah di
+  pratinjau lengkap dengan nomor usulan asalnya.
+- Memperbaiki penggabungan dua sheet sumber yang selama ini memakai kolom
+  `ID Indikator`. Penomoran IUP kedua sheet berbeda, sehingga realisasi
+  menempel ke indikator yang salah tanpa galat apa pun dan 80 dari 660 baris
+  nilai hilang diam-diam. Kunci gabung kini `(Kategori, Kode Indikator)`.
+
 ### Tahap 1 - Audit sumber data
 
 - Menambahkan audit otomatis lima sheet, termasuk deteksi header/merged cell, tipe data, sel kosong, anomali angka dan teks, serta pemetaan indikator antar-sheet.

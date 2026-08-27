@@ -36,11 +36,26 @@ Buka **Admin**, masukkan akun, lalu pilih fungsi yang diperlukan. Kata sandi awa
 
 ## 6. Mengunggah Excel baru
 
-1. Admin memilih file `.xlsx`; file lama tidak ditimpa.
-2. Sistem memvalidasi lima nama sheet dan menjalankan ETL pada staging.
-3. Periksa pratinjau indikator baru/hilang, status berpindah, dan nilai berubah.
-4. Pilih **Setujui perubahan** hanya jika pratinjau benar.
-5. Sistem menerapkan perubahan, menulis audit log, dan mengambil snapshot ketersediaan.
+Panel **Unggah Excel indikator** ada di halaman admin, khusus peran ADMIN.
+
+1. Pilih berkas `.xlsx`. Berkas wajib memuat sheet **Basis Data Indikator**
+   (tepat 86 baris indikator) dan **Data Target-Realisasi**. Sheet nilai boleh
+   terisi sebagian — tidak semua indikator harus punya angka.
+2. Tekan **Pratinjau**. Berkas diarsipkan lalu dibandingkan dengan isi basis
+   data; belum ada yang berubah pada tahap ini.
+3. Periksa empat kartu ringkasan: indikator baru, indikator yang tidak ada di
+   berkas, nilai berubah, dan **nilai dilindungi**.
+4. Tekan **Setujui & muat** hanya bila pratinjau sudah benar. Sistem memuat
+   dataset dalam satu transaksi dan menulis jejak audit.
+
+**Arti "nilai dilindungi".** Angka yang sudah melewati alur usulan operator ->
+verifikator dianggap lebih tepercaya daripada isi berkas Excel. Bila berkas
+memuat angka berbeda untuk sel yang sama, barisnya ditampilkan terpisah dengan
+badge nomor usulan asalnya dan **tidak** ikut ditimpa. Untuk mengubah angka
+seperti itu, kirim usulan baru lewat alur verifikasi, bukan lewat unggahan.
+
+Berkas selain `.xlsx` ditolak. `.xls` lama perlu disimpan ulang sebagai
+`.xlsx` lebih dulu.
 
 ## 7. Mengunduh data
 

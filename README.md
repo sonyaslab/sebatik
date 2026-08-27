@@ -63,9 +63,10 @@ Tarakan. Perintah seed menyiapkan dua akun operator per wilayah dengan pola `ope
 
 ## Memperbarui data
 
-Produksi tidak membaca Excel atau PDF secara langsung. Sumber yang telah
-diklasifikasikan ditransformasi menjadi dataset JSON terstandar berversi, melewati
-gerbang validasi, lalu dimuat ke PostgreSQL dalam satu transaksi.
+Ada dua jalur, dan keduanya melewati gerbang validasi yang sama sebelum
+menyentuh PostgreSQL: manifest jumlah baris, 86 ID master tiga digit,
+integritas referensial, dan checksum SHA-256. PDF tetap hanya diproses di
+zona sumber.
 
 ```powershell
 # Zona transformasi — tidak mengakses database produksi
@@ -80,10 +81,22 @@ python -m scripts.kelola_database validasi data/processed/sebatik-database.json
 python -m scripts.kelola_database muat data/processed/sebatik-database.json
 ```
 
-Untuk operasi rutin, admin mengunggah dataset database `.json`, memeriksa diff, lalu
-menyetujuinya. Dataset mewajibkan tepat 86 ID master tiga digit, manifest jumlah
-baris, integritas referensial, dan checksum SHA-256. Excel/PDF hanya boleh
-dipakai oleh proses hulu untuk menghasilkan JSON sumber terklasifikasi.
+Berkas `.xlsx` juga dapat langsung ditransformasi tanpa lewat JSON sumber:
+
+```powershell
+python -m scripts.kelola_database excel `
+  "data/raw/BASIS_DATA_INDIKATOR_ISV-IUP_KALTARA.xlsx" `
+  data/processed/sebatik-database.json
+```
+
+Untuk operasi rutin, admin mengunggah berkas Excel `.xlsx` lewat halaman
+admin, memeriksa pratinjau perubahan, lalu menyetujuinya — tanpa terminal.
+Gerbang HTTP hanya menerima `.xlsx`; jalur JSON tetap tersedia di CLI karena
+dipakai deployment container dan CI.
+
+Nilai yang sudah melewati verifikasi operator -> verifikator dilindungi:
+unggahan massal tidak pernah menimpanya, dan baris seperti itu ditampilkan
+terpisah di pratinjau sebagai "nilai dilindungi".
 
 Prosedur lengkap pengembangan, pull request, deployment, backup, pemuatan
 PostgreSQL, verifikasi, dan rollback tersedia di

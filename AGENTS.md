@@ -114,7 +114,7 @@ OPERATOR (wilayah) -> MENUNGGU_VERIFIKASI -> VERIFIKATOR/ADMIN -> DISETUJUI / DI
 - Verifikator bertugas di tingkat provinsi (`65`); tidak seorang pun boleh memverifikasi usulannya sendiri.
 - Satu keputusan verifikasi menulis **satu** baris `nilai_indikator` dalam **satu** transaksi.
 - Nilai wilayah baru muncul di dasbor publik setelah **DISETUJUI**; penolakan tidak mengubah angka publik.
-- Admin mengelola akun, status akses, koreksi `arah_baik`, unggahan Excel massal (staging + diff + persetujuan), dan audit.
+- Admin mengelola akun, status akses, koreksi `arah_baik`, unggahan Excel massal (unggah `.xlsx` -> arsip -> diff -> persetujuan), dan audit. Nilai yang berasal dari alur verifikasi (`nilai_indikator.usulan_id` terisi) tidak pernah ditimpa unggahan massal.
 
 ## Yang perlu diketahui sebelum mengubah
 

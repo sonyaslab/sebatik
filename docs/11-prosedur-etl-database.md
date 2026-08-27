@@ -1,11 +1,19 @@
 # Prosedur ETL Database SEBATIK
 
 Dokumen ini menjadi prosedur operasional transformasi dan pemuatan data master
-SEBATIK ke PostgreSQL. Database produksi tidak membaca Excel atau PDF secara
-langsung. Berkas tersebut diproses di zona sumber dan menghasilkan JSON sumber
-terklasifikasi. Hanya dataset database tervalidasi yang boleh masuk ke produksi.
+SEBATIK ke PostgreSQL. Ada dua jalur resmi, dan keduanya melewati gerbang
+validasi yang sama (`validasi_dataset`): manifest, pola ID, integritas
+referensial, dan checksum SHA-256. PDF tetap berhenti di zona sumber.
+
+- **Jalur CLI (rilis terkendali).** Dipakai deployment container dan CI.
+  Berbasis JSON dataset yang ikut direview di pull request.
+- **Jalur UI admin (pemutakhiran rutin).** Admin mengunggah `.xlsx` langsung
+  dari halaman admin, memeriksa pratinjau perubahan, lalu menyetujuinya.
+  Tidak butuh terminal.
 
 ## 1. Alur dan pemisahan tanggung jawab
+
+Jalur CLI:
 
 ```text
 Excel/PDF sumber
@@ -19,6 +27,27 @@ Excel/PDF sumber
   -> pemuatan satu transaksi
   -> verifikasi API dan dasbor
 ```
+
+Jalur UI admin:
+
+```text
+Excel .xlsx
+  -> unggah di halaman admin
+  -> konversi src/etl/excel.py + validasi dataset yang sama
+  -> pratinjau diff (indikator baru/hilang, nilai berubah, nilai dilindungi)
+  -> persetujuan admin
+  -> pemuatan satu transaksi
+```
+
+**Nilai dilindungi.** Nilai yang berasal dari alur usulan operator ->
+verifikator (`nilai_indikator.usulan_id` terisi) tidak pernah ditimpa
+unggahan massal. Baris seperti itu ditampilkan terpisah di pratinjau beserta
+nomor usulannya, dan dilewati saat pemuatan.
+
+**Kunci gabung dua sheet.** `Basis Data Indikator` dan `Data Target-Realisasi`
+digabung lewat `(Kategori, Kode Indikator)`, bukan lewat kolom `ID Indikator`.
+Penomoran IUP kedua sheet berbeda; menggabungkan lewat ID menempelkan
+realisasi ke indikator yang salah tanpa galat apa pun.
 
 | Peran | Tanggung jawab |
 |---|---|

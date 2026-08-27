@@ -44,7 +44,8 @@ flowchart LR
     A1 --> A2["Kelola akun, peran, status, wilayah, dan reset kata sandi"]
     A1 --> A3["Verifikasi usulan seperti Verifikator"]
     A1 --> A4["Koreksi arah baik indikator"]
-    A1 --> A5["Unggah Excel massal"]
+    A1 --> A5["Unggah Excel .xlsx massal
+pratinjau + nilai dilindungi"]
     A5 --> A6["Validasi file dan jalankan ETL pada database staging"]
     A6 --> A7["Tinjau pratinjau perubahan"]
     A7 --> A8{"Setujui perubahan?"}
