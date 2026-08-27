@@ -246,3 +246,14 @@ def lepaskan_log_perubahan(session: Session, id_indikator: str) -> None:
     """
     session.execute(update(LogPerubahan).where(LogPerubahan.id_indikator == id_indikator).values(id_indikator=None))
     session.flush()
+
+
+def daftar_unggahan(session: Session, batas: int = 10) -> list[tuple[UnggahanExcel, str | None]]:
+    """Unggahan terakhir beserta nama pengunggahnya, untuk riwayat panel admin."""
+    stmt = (
+        select(UnggahanExcel, Pengguna.username)
+        .join(Pengguna, Pengguna.id == UnggahanExcel.pengguna_id, isouter=True)
+        .order_by(UnggahanExcel.dibuat_pada.desc(), UnggahanExcel.id.desc())
+        .limit(batas)
+    )
+    return [(baris, username) for baris, username in session.execute(stmt)]

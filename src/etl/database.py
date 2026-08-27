@@ -1,7 +1,11 @@
 """Dataset database tervalidasi untuk memuat skema aplikasi SEBATIK.
 
-Excel dan PDF berhenti di zona sumber. Produksi hanya menerima JSON terstandar
-berversi yang sudah memakai ID master tiga digit dan bentuk tabel target.
+Bentuk kanonisnya tetap JSON terstandar berversi dengan ID master tiga digit
+dan tabel target. Yang berubah sejak fitur unggah admin: `.xlsx` kini boleh
+masuk lewat gerbang API dan CLI, dikonversi lebih dulu oleh `src/etl/excel.py`.
+Yang TIDAK berubah adalah ketatnya pemeriksaan — apa pun jalur masuknya, setiap
+dataset wajib lolos `validasi_dataset()` sebelum menyentuh basis data. PDF tetap
+berhenti di zona sumber.
 """
 
 from __future__ import annotations
@@ -96,7 +100,9 @@ def transformasi_sumber_database(isi: dict[str, Any]) -> dict[str, Any]:
                 "status_metadata": _teks(baris.get("Status Metadata")),
                 "status_ketersediaan": _teks(baris.get("Ketersediaan Data")),
                 "periode_data": _teks(baris.get("Periode Data")),
-                "tahun_terakhir": int(baris["Tahun Data Terakhir"]) if _angka(baris.get("Tahun Data Terakhir")) else None,
+                "tahun_terakhir": int(baris["Tahun Data Terakhir"])
+                if _angka(baris.get("Tahun Data Terakhir"))
+                else None,
                 "is_proxy": (_teks(baris.get("Indikator Proxy?")) or "").casefold() in {"ya", "yes"},
                 "catatan_teknis": _teks(baris.get("Catatan Kualitas Data")),
                 "status_rpjmd": "MASUK_RPJMD",
@@ -173,6 +179,9 @@ def validasi_dataset(dataset: dict[str, Any]) -> None:
     metadata = data.get("metadata_indikator", [])
     nilai = data.get("nilai_indikator", [])
     ids = [item.get("id_indikator") for item in indikator]
+    # Master wajib lengkap; `nilai_indikator` sengaja TIDAK punya batas bawah
+    # sehingga unggahan dengan sheet nilai parsial (bahkan kosong) tetap sah.
+    # Aturan ini keputusan desain, bukan kelalaian — jangan "diperbaiki".
     if len(ids) != JUMLAH_INDIKATOR or len(set(ids)) != JUMLAH_INDIKATOR:
         raise DatasetTidakValid(f"Master harus berisi tepat {JUMLAH_INDIKATOR} ID unik")
     if any(not isinstance(iid, str) or not POLA_ID.fullmatch(iid) for iid in ids):
@@ -190,14 +199,36 @@ def validasi_dataset(dataset: dict[str, Any]) -> None:
         raise DatasetTidakValid("Checksum data dataset tidak sesuai")
 
 
-def muat_dataset(session: Session, dataset: dict[str, Any]) -> dict[str, int]:
-    """Upsert dataset ke skema aplikasi; pemanggil mengatur commit/rollback."""
+def transformasi_workbook_excel(isi: bytes, nama: str) -> dict[str, Any]:
+    """Byte `.xlsx` -> dataset tervalidasi. Titik masuk tunggal API dan CLI.
+
+    Impor `excel` sengaja di dalam fungsi: modul itu mengimpor
+    `DatasetTidakValid` dari sini, jadi impor tingkat modul akan melingkar.
+    """
+    from .excel import baca_workbook
+
+    return transformasi_sumber_database(baca_workbook(isi, nama))
+
+
+def muat_dataset(
+    session: Session,
+    dataset: dict[str, Any],
+    *,
+    lewati_nilai: set[tuple[str, str, int, str, int | None]] | None = None,
+) -> dict[str, int]:
+    """Upsert dataset ke skema aplikasi; pemanggil mengatur commit/rollback.
+
+    `lewati_nilai` berisi kunci `(id_indikator, wilayah_kode, tahun, jenis,
+    periode)` yang tidak boleh ditimpa — dipakai gerbang unggah untuk
+    melindungi nilai hasil verifikasi operator. `None` (bawaan) berarti tidak
+    ada yang dilindungi, sama seperti perilaku CLI sebelumnya.
+    """
     from backend.app.models import Indikator, MetadataIndikator
     from backend.app.repositories import nilai as repo_nilai
 
     validasi_dataset(dataset)
     data = dataset["data"]
-    berubah = {"indikator": 0, "metadata_indikator": 0, "nilai_indikator": 0}
+    berubah = {"indikator": 0, "metadata_indikator": 0, "nilai_indikator": 0, "nilai_dilewati": 0}
     for kolom in data["indikator"]:
         baris_indikator = session.get(Indikator, kolom["id_indikator"])
         if baris_indikator is None:
@@ -220,6 +251,16 @@ def muat_dataset(session: Session, dataset: dict[str, Any]) -> dict[str, int]:
             setattr(baris_metadata, nama, nilai)
         berubah["metadata_indikator"] += 1
     for kolom in data["nilai_indikator"]:
+        kunci = (
+            kolom["id_indikator"],
+            kolom["wilayah_kode"],
+            kolom["tahun"],
+            kolom["jenis"],
+            kolom.get("periode"),
+        )
+        if lewati_nilai is not None and kunci in lewati_nilai:
+            berubah["nilai_dilewati"] += 1
+            continue
         repo_nilai.upsert(session, **kolom)
         berubah["nilai_indikator"] += 1
     return berubah
@@ -232,5 +273,3 @@ def baca_dataset(path: Path) -> dict[str, Any]:
         raise DatasetTidakValid(f"Dataset tidak dapat dibaca: {exc}") from exc
     validasi_dataset(dataset)
     return dataset
-
-

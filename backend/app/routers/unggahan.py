@@ -1,4 +1,8 @@
-"""Endpoint dataset database ETL terstandar: pratinjau diff dan persetujuan."""
+"""Endpoint unggah Excel indikator: pratinjau diff, persetujuan, dan riwayat.
+
+Gerbang HTTP hanya menerima `.xlsx`. Jalur JSON tetap ada di CLI
+(`scripts/kelola_database.py`) karena dipakai deployment container dan CI.
+"""
 
 from __future__ import annotations
 
@@ -13,7 +17,7 @@ from ..models import Peran, StatusUnggahan
 from ..repositories import tata_kelola as repo_tata_kelola
 from ..repositories.pengguna import ProfilPengguna
 from ..schemas.umum import StatusResponse
-from ..schemas.unggahan import PratinjauResponse
+from ..schemas.unggahan import PratinjauResponse, RiwayatUnggahanResponse
 from ..services import unggahan as svc
 
 router = APIRouter(prefix="/api/v1", tags=["unggahan"])
@@ -27,15 +31,17 @@ async def pratinjau_unggahan(
     admin: ProfilPengguna = Depends(hanya_admin),
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
-    if not svc.berekstensi_database(file.filename):
-        raise HTTPException(422, "Hanya dataset database .json")
+    if svc.berekstensi_xls_lama(file.filename):
+        raise HTTPException(422, "Format .xls lama tidak didukung; simpan ulang sebagai .xlsx")
+    if not svc.berekstensi_excel(file.filename):
+        raise HTTPException(422, "Hanya berkas Excel .xlsx")
     isi = await file.read()
     if not svc.ukuran_wajar(len(isi)):
         raise HTTPException(413, "File melebihi 30 MB")
 
     arsip = svc.arsipkan(isi)
     try:
-        diff, _ = svc.susun_diff(session, arsip)
+        diff, _ = svc.susun_diff(session, arsip, file.filename)
     except svc.BerkasTidakValid as exc:
         raise HTTPException(422, str(exc)) from exc
     except Exception as exc:
@@ -71,3 +77,11 @@ def setujui_unggahan(
         raise HTTPException(409, str(exc)) from exc
     session.commit()
     return {"status": "DISETUJUI"}
+
+
+@router.get("/admin/unggah", response_model=RiwayatUnggahanResponse)
+def riwayat_unggahan(
+    admin: ProfilPengguna = Depends(hanya_admin),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    return svc.riwayat(session)
