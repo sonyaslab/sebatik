@@ -200,3 +200,78 @@ def ubah_arah_baik(indikator: Indikator, arah_baik: str) -> str | None:
     indikator.arah_baik = arah_baik
     indikator.arah_baik_terverifikasi = True
     return lama
+
+
+def punya_nilai(session: Session, id_indikator: str) -> bool:
+    stmt = select(NilaiIndikator.id).where(NilaiIndikator.id_indikator == id_indikator).limit(1)
+    return session.scalars(stmt).first() is not None
+
+
+def id_dengan_nilai(session: Session, ids: Sequence[str]) -> set[str]:
+    """Subset dari `ids` yang punya minimal satu baris `nilai_indikator`.
+
+    Satu query untuk seluruh halaman, bukan satu query per baris — daftar
+    admin bisa memuat 200 baris sekaligus dan tiap baris butuh penanda ini
+    untuk mengaktifkan/menonaktifkan tombol hapusnya.
+    """
+    if not ids:
+        return set()
+    stmt = select(NilaiIndikator.id_indikator.distinct()).where(NilaiIndikator.id_indikator.in_(ids))
+    return set(session.scalars(stmt))
+
+
+def buat(
+    session: Session,
+    indikator_fields: dict[str, object],
+    metadata_fields: dict[str, object],
+) -> Indikator:
+    """Buat indikator+metadata baru. Tidak commit — pemanggil (service) yang commit."""
+    indikator = Indikator(**indikator_fields)
+    session.add(indikator)
+    session.flush()  # perlu id_indikator terisi sebelum baris metadata dibuat
+    session.add(MetadataIndikator(id_indikator=indikator.id_indikator, **metadata_fields))
+    return indikator
+
+
+def perbarui(
+    session: Session,
+    indikator: Indikator,
+    metadata: MetadataIndikator | None,
+    indikator_fields: dict[str, object],
+    metadata_fields: dict[str, object],
+) -> dict[str, tuple[object, object]]:
+    """Terapkan field baru; kembalikan {field: (lama, baru)} hanya utk field yang berubah.
+
+    Dipakai pemanggil (service) untuk menulis satu baris LogPerubahan per
+    field yang benar-benar berubah nilainya — form ini full-replace, jadi
+    sebagian besar field dikirim ulang tanpa berubah setiap kali disimpan.
+    """
+    perubahan: dict[str, tuple[object, object]] = {}
+
+    for field, baru in indikator_fields.items():
+        lama = getattr(indikator, field)
+        if lama != baru:
+            perubahan[field] = (lama, baru)
+            setattr(indikator, field, baru)
+
+    if metadata is None:
+        metadata = MetadataIndikator(id_indikator=indikator.id_indikator)
+        session.add(metadata)
+    for field, baru in metadata_fields.items():
+        lama = getattr(metadata, field)
+        if lama != baru:
+            perubahan[f"metadata.{field}"] = (lama, baru)
+            setattr(metadata, field, baru)
+
+    return perubahan
+
+
+def hapus(session: Session, indikator: Indikator) -> None:
+    """Hapus indikator; `metadata_indikator` ikut terhapus lewat FK CASCADE.
+
+    Lihat `ondelete="CASCADE"` di backend/app/models/indikator.py — tidak
+    perlu dihapus manual di sini. Pemanggil (service) yang memastikan lewat
+    `punya_nilai()` bahwa indikator ini memang boleh dihapus SEBELUM
+    memanggil fungsi ini.
+    """
+    session.delete(indikator)
