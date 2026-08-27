@@ -25,6 +25,15 @@ export function pesanGalatUnggah(error, cadangan) {
 
 const angka = nilai => (nilai === null || nilai === undefined ? '—' : nilai)
 
+/* Log butuh jam, bukan sekadar tanggal: satu berkas bisa diunggah dan
+   diterapkan pada hari yang sama. */
+function waktuTeks(nilai) {
+  if (!nilai) return '—'
+  const waktu = new Date(nilai)
+  if (Number.isNaN(waktu.getTime())) return dateText(nilai)
+  return `${dateText(nilai)} ${waktu.toLocaleTimeString('id-ID', {hour: '2-digit', minute: '2-digit'})}`
+}
+
 function TabelNilai({baris, konflik = false, uji}) {
   const tampil = baris.slice(0, BATAS_BARIS)
   return (
@@ -70,7 +79,17 @@ export function UnggahExcelPanel({onNotify, onSelesai}) {
   const [pratinjau, setPratinjau] = useState(null)
   const [sibuk, setSibuk] = useState(false)
   const [riwayat, setRiwayat] = useState([])
+  /* Pesan juga ditahan di dalam panel. `onNotify` merender notice di puncak
+     halaman admin yang panjang — kalau unggahan gagal, admin yang sedang
+     melihat panel ini tidak melihat apa pun dan mengira tombolnya mati. */
+  const [kabar, setKabar] = useState(null)
   const inputRef = useRef(null)
+
+  /* Satu pintu pesan: tampil di dalam panel DAN di notice halaman. */
+  const lapor = (teks, nada) => {
+    setKabar({teks, nada})
+    onNotify?.(teks, nada === 'success' ? 'success' : 'warning')
+  }
 
   const muatRiwayat = async () => {
     try {
@@ -89,17 +108,18 @@ export function UnggahExcelPanel({onNotify, onSelesai}) {
     event.preventDefault()
     const berkas = inputRef.current?.files?.[0]
     if (!berkas) {
-      onNotify('Pilih berkas .xlsx lebih dulu.')
+      lapor('Pilih berkas .xlsx lebih dulu.', 'warning')
       return
     }
     const form = new FormData()
     form.set('file', berkas)
     setSibuk(true)
+    setKabar(null)
     try {
       const hasil = await pratinjauUnggahan(form)
       setPratinjau(hasil)
     } catch (error) {
-      onNotify(pesanGalatUnggah(error, 'Pratinjau unggahan gagal'))
+      lapor(pesanGalatUnggah(error, 'Pratinjau unggahan gagal'), 'warning')
     } finally {
       setSibuk(false)
     }
@@ -110,13 +130,13 @@ export function UnggahExcelPanel({onNotify, onSelesai}) {
     setSibuk(true)
     try {
       await setujuiUnggahan(pratinjau.id)
-      onNotify('Dataset berhasil dimuat.', 'success')
+      lapor('Dataset berhasil dimuat.', 'success')
       setPratinjau(null)
       if (inputRef.current) inputRef.current.value = ''
       muatRiwayat()
       onSelesai?.()
     } catch (error) {
-      onNotify(pesanGalatUnggah(error, 'Persetujuan unggahan gagal'))
+      lapor(pesanGalatUnggah(error, 'Persetujuan unggahan gagal'), 'warning')
     } finally {
       setSibuk(false)
     }
@@ -137,19 +157,26 @@ export function UnggahExcelPanel({onNotify, onSelesai}) {
       title="Unggah Excel indikator"
       desc="Unggah berkas .xlsx basis data indikator, periksa pratinjau, lalu setujui untuk memuatnya."
     >
+      {kabar && (
+        <p className={`unggah-kabar ${kabar.nada}`} data-uji="kabar" role="status">
+          {kabar.teks}
+        </p>
+      )}
+
       {!pratinjau && (
-        <form className="role-form" data-uji="form-unggah" onSubmit={kirimPratinjau}>
-          <label className="file-field">
+        <form className="unggah-form" data-uji="form-unggah" onSubmit={kirimPratinjau}>
+          <label className="unggah-berkas">
             <span>Berkas Excel (.xlsx)</span>
             <input ref={inputRef} data-uji="input-berkas" type="file" name="file" accept=".xlsx" required />
-            <small>
-              Wajib memuat sheet <b>Basis Data Indikator</b> (86 baris) dan <b>Data Target-Realisasi</b>.
-              Sheet nilai boleh terisi sebagian.
-            </small>
           </label>
-          <button data-uji="tombol-pratinjau" disabled={sibuk}>
-            <Upload size={16} /> {sibuk ? 'Memproses…' : 'Pratinjau'}
+          <button className="unggah-tombol" data-uji="tombol-pratinjau" disabled={sibuk}>
+            <Upload size={16} aria-hidden="true" />
+            {sibuk ? 'Memproses…' : 'Pratinjau'}
           </button>
+          <small className="unggah-petunjuk">
+            Wajib memuat sheet <b>Basis Data Indikator</b> (86 baris) dan <b>Data Target-Realisasi</b>.
+            Sheet nilai boleh terisi sebagian.
+          </small>
         </form>
       )}
 
@@ -213,8 +240,9 @@ export function UnggahExcelPanel({onNotify, onSelesai}) {
             <thead>
               <tr>
                 <th>Berkas</th>
-                <th>Status</th>
-                <th>Waktu</th>
+                <th>Diunggah</th>
+                <th>Perubahan diterapkan</th>
+                <th>Hasil</th>
                 <th>Oleh</th>
               </tr>
             </thead>
@@ -224,14 +252,24 @@ export function UnggahExcelPanel({onNotify, onSelesai}) {
                   <td>
                     <FileSpreadsheet size={14} /> {item.nama_file_asli}
                   </td>
+                  <td>{waktuTeks(item.diunggah_pada)}</td>
                   <td>
-                    <span
-                      className={`indicator-state ${item.status === 'DISETUJUI' ? 'tersedia' : 'belum-tersedia'}`}
-                    >
-                      {item.status}
-                    </span>
+                    {item.diterapkan_pada ? (
+                      waktuTeks(item.diterapkan_pada)
+                    ) : (
+                      <span className="unggah-belum">belum diterapkan</span>
+                    )}
                   </td>
-                  <td>{item.dibuat_pada ? dateText(item.dibuat_pada) : '—'}</td>
+                  <td>
+                    {item.diterapkan_pada ? (
+                      <>
+                        {item.nilai_dimuat ?? 0} nilai dimuat
+                        {item.nilai_dilindungi ? `, ${item.nilai_dilindungi} dilindungi` : ''}
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
                   <td>{item.oleh || 'sistem'}</td>
                 </tr>
               ))}

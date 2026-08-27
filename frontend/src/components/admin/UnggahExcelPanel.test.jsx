@@ -50,14 +50,47 @@ function pasangBerkas(input) {
 }
 
 describe('UnggahExcelPanel', () => {
-  it('menampilkan riwayat unggahan saat dimuat', async () => {
+  it('menampilkan riwayat sebagai log waktu, bukan status persetujuan', async () => {
     vi.spyOn(endpoints, 'riwayatUnggahan').mockResolvedValue({
-      data: [{id: 1, nama_file_asli: 'basis.xlsx', status: 'DISETUJUI', dibuat_pada: null, oleh: 'admin'}],
+      data: [
+        {
+          id: 1,
+          nama_file_asli: 'basis.xlsx',
+          status: 'DISETUJUI',
+          diunggah_pada: '2026-08-27T02:15:00Z',
+          diterapkan_pada: '2026-08-27T02:20:00Z',
+          nilai_dimuat: 659,
+          nilai_dilindungi: 1,
+          oleh: 'admin',
+        },
+      ],
     })
     render(<UnggahExcelPanel onNotify={() => {}} />)
     await act(async () => {})
     expect(wadah.textContent).toContain('basis.xlsx')
-    expect(wadah.textContent).toContain('DISETUJUI')
+    expect(wadah.textContent).toContain('659 nilai dimuat')
+    expect(wadah.textContent).toContain('1 dilindungi')
+    expect(wadah.textContent).not.toContain('MENUNGGU_PERSETUJUAN')
+  })
+
+  it('menandai unggahan yang belum diterapkan', async () => {
+    vi.spyOn(endpoints, 'riwayatUnggahan').mockResolvedValue({
+      data: [
+        {
+          id: 2,
+          nama_file_asli: 'antre.xlsx',
+          status: 'MENUNGGU_PERSETUJUAN',
+          diunggah_pada: '2026-08-27T02:15:00Z',
+          diterapkan_pada: null,
+          nilai_dimuat: null,
+          nilai_dilindungi: null,
+          oleh: 'admin',
+        },
+      ],
+    })
+    render(<UnggahExcelPanel onNotify={() => {}} />)
+    await act(async () => {})
+    expect(wadah.textContent).toContain('belum diterapkan')
   })
 
   it('mengirim berkas ke pratinjauUnggahan dan menampilkan tabel konflik', async () => {
@@ -134,7 +167,9 @@ describe('UnggahExcelPanel', () => {
     pasangBerkas(wadah.querySelector('[data-uji="input-berkas"]'))
     await act(async () => kirimForm(wadah.querySelector('[data-uji="form-unggah"]')))
 
-    expect(notify).toHaveBeenCalledWith('Master harus berisi tepat 86 ID unik')
+    expect(notify).toHaveBeenCalledWith('Master harus berisi tepat 86 ID unik', 'warning')
+    // Pesan juga muncul DI DALAM panel; notice puncak halaman terlalu jauh.
+    expect(wadah.querySelector('[data-uji="kabar"]').textContent).toContain('86 ID unik')
   })
 })
 

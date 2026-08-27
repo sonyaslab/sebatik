@@ -41,10 +41,16 @@ class PratinjauResponse(BaseModel):
 
 
 class RiwayatUnggahan(BaseModel):
+    """Satu baris log unggahan: kapan diunggah, kapan perubahannya diterapkan."""
+
     id: int
     nama_file_asli: str
     status: str
-    dibuat_pada: datetime | None = None
+    diunggah_pada: datetime | None = None
+    diterapkan_pada: datetime | None = None
+    nilai_dimuat: int | None = None
+    nilai_dilindungi: int | None = None
+    indikator_baru: int | None = None
     oleh: str | None = None
 
 

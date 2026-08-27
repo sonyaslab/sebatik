@@ -218,23 +218,53 @@ def terapkan(session: Session, unggahan: Any, pengguna_id: int | None) -> int:
         },
     )
 
+    # Ringkasan diff yang tersimpan ditimpa dengan angka yang BENAR-BENAR
+    # diterapkan. Kolomnya sudah ada (TEXT), jadi log riwayat bisa menampilkan
+    # hasil nyata tanpa perlu migrasi kolom baru.
+    unggahan.ringkasan_diff = ringkasan_diff_json(
+        {
+            **json.loads(unggahan.ringkasan_diff or "{}"),
+            "diterapkan": {
+                "indikator": hasil["indikator"],
+                "nilai_dimuat": hasil["nilai_indikator"],
+                "nilai_dilindungi": hasil["nilai_dilewati"],
+            },
+        }
+    )
     unggahan.status = StatusUnggahan.DISETUJUI
     unggahan.disetujui_pada = datetime.now(UTC)
     return hasil["nilai_indikator"]
+
+
+def _baris_riwayat(baris: Any, username: str | None) -> dict[str, Any]:
+    """Satu baris log: waktu unggah, waktu penerapan, dan apa yang berubah.
+
+    Angka diambil dari blok `diterapkan` yang ditulis `terapkan()`; selama
+    unggahan belum disetujui, blok itu belum ada dan angkanya None.
+    """
+    try:
+        ringkasan = json.loads(baris.ringkasan_diff or "{}")
+    except ValueError:
+        ringkasan = {}
+    diterapkan = ringkasan.get("diterapkan") or {}
+    return {
+        "id": baris.id,
+        "nama_file_asli": baris.nama_file_asli,
+        "status": baris.status,
+        "diunggah_pada": baris.dibuat_pada,
+        "diterapkan_pada": baris.disetujui_pada,
+        "nilai_dimuat": diterapkan.get("nilai_dimuat"),
+        "nilai_dilindungi": diterapkan.get("nilai_dilindungi"),
+        "indikator_baru": diterapkan.get("indikator"),
+        "oleh": username,
+    }
 
 
 def riwayat(session: Session, batas: int = 10) -> dict[str, Any]:
     """Muatan `GET /admin/unggah` — perakitan bentuk respons ada di sini, bukan router."""
     return {
         "data": [
-            {
-                "id": baris.id,
-                "nama_file_asli": baris.nama_file_asli,
-                "status": baris.status,
-                "dibuat_pada": baris.dibuat_pada,
-                "oleh": username,
-            }
-            for baris, username in repo_tata_kelola.daftar_unggahan(session, batas)
+            _baris_riwayat(baris, username) for baris, username in repo_tata_kelola.daftar_unggahan(session, batas)
         ]
     }
 

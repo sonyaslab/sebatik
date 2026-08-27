@@ -171,7 +171,12 @@ def test_setuju_memuat_nilai_dan_riwayat_tercatat(client, auth):
     riwayat = client.get("/api/v1/admin/unggah", headers=auth)
     assert riwayat.status_code == 200
     baris = riwayat.json()["data"]
-    assert any(item["id"] == unggahan_id and item["status"] == "DISETUJUI" for item in baris)
+    catatan = next(item for item in baris if item["id"] == unggahan_id)
+    # Log mencatat dua waktu: kapan diunggah dan kapan perubahannya diterapkan.
+    assert catatan["diunggah_pada"]
+    assert catatan["diterapkan_pada"]
+    assert catatan["nilai_dimuat"] >= 1
+    assert catatan["nilai_dilindungi"] == 0
     assert baris[0]["oleh"] == "admin"
 
 
@@ -238,3 +243,15 @@ def test_nilai_hasil_verifikasi_dilindungi_dari_unggahan(client, auth, db_uji):
         )
         assert tetap.nilai == 777.0, "nilai hasil verifikasi tidak boleh ditimpa unggahan"
     mesin.dispose()
+
+
+def test_riwayat_unggahan_belum_disetujui_tanpa_waktu_penerapan(client, auth):
+    """Baris yang baru dipratinjau tercatat waktunya, tapi belum punya hasil."""
+    unggahan_id = _unggah(client, auth, _workbook(), "belum-disetujui.xlsx").json()["id"]
+
+    catatan = next(
+        item for item in client.get("/api/v1/admin/unggah", headers=auth).json()["data"] if item["id"] == unggahan_id
+    )
+    assert catatan["diunggah_pada"]
+    assert catatan["diterapkan_pada"] is None
+    assert catatan["nilai_dimuat"] is None
