@@ -6,9 +6,14 @@ bergantung pada data/raw/ yang tidak ter-commit.
 
 from __future__ import annotations
 
+import pytest
 from openpyxl import Workbook
 
-from scripts.ekspor_seed_indikator import baca_indikator_dan_metadata, baca_nilai
+from scripts.ekspor_seed_indikator import (
+    baca_indikator_dan_metadata,
+    baca_nilai,
+    indeks_kanonis,
+)
 
 HEADER_INDIKATOR = [
     "ID Indikator",
@@ -245,7 +250,7 @@ def test_baca_nilai_memetakan_jenis_dan_wilayah_provinsi():
             ["ISV-001", "ISV", "Kelompok", "1", "Nama", "Target", 2025, 227.1, None, None],
         ]
     )
-    nilai = baca_nilai(wb)
+    nilai = baca_nilai(wb, {("ISV", "1"): "ISV-001"})
     assert len(nilai) == 2
     assert nilai[0]["jenis"] == "realisasi"
     assert nilai[0]["wilayah_kode"] == "65"
@@ -257,12 +262,60 @@ def test_baca_nilai_memetakan_jenis_dan_wilayah_provinsi():
 
 def test_baca_nilai_melewati_baris_jenis_tidak_dikenal():
     wb = _wb_nilai([["ISV-001", "ISV", "Kelompok", "1", "Nama", "Bukan Jenis", 2021, 1.0, None, None]])
-    assert baca_nilai(wb) == []
+    assert baca_nilai(wb, {("ISV", "1"): "ISV-001"}) == []
 
 
 def test_baca_nilai_mempertahankan_teks_asli_dan_satuan_catatan():
     wb = _wb_nilai([["IUP-001", "IUP", "Kelompok", "1", "Nama", "Realisasi", 2020, None, "70,5", "angka sementara"]])
-    nilai = baca_nilai(wb)
+    nilai = baca_nilai(wb, {("IUP", "1"): "IUP-001"})
     assert nilai[0]["nilai"] is None
     assert nilai[0]["nilai_teks"] == "70,5"
     assert nilai[0]["satuan_catatan"] == "angka sementara"
+
+
+def test_indeks_kanonis_memetakan_kategori_dan_kode_ke_id():
+    wb = _wb_indikator(
+        [
+            [
+                "ISV-001",
+                "ISV",
+                "Kelompok",
+                "Arah",
+                "1",
+                "Nama",
+                "Tidak",
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ]
+        ]
+    )
+    indikator, _metadata = baca_indikator_dan_metadata(wb)
+    assert indeks_kanonis(indikator) == {("ISV", "1"): "ISV-001"}
+
+
+def test_baca_nilai_memakai_kode_bukan_id_indikator_sheet_nilai():
+    """Penomoran IUP kedua sheet berbeda; kunci gabung wajib (kategori, kode).
+
+    Baris di bawah memakai ID "IUP-011" seperti di sheet nilai asli, padahal
+    indikator yang dimaksud (kode "1") adalah "IUP-001" di sheet pertama.
+    """
+    wb = _wb_nilai([["IUP-011", "IUP", "Kelompok", "1", "Nama", "Realisasi", 2021, 70.5, None, None]])
+    nilai = baca_nilai(wb, {("IUP", "1"): "IUP-001"})
+    assert nilai[0]["id_indikator"] == "IUP-001"
+
+
+def test_baca_nilai_gagal_keras_saat_kode_tidak_dikenal():
+    wb = _wb_nilai([["IUP-011", "IUP", "Kelompok", "99", "Nama", "Realisasi", 2021, 1.0, None, None]])
+    with pytest.raises(ValueError, match="tidak ada di sheet"):
+        baca_nilai(wb, {("IUP", "1"): "IUP-001"})
