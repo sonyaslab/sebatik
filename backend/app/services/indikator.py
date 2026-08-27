@@ -313,9 +313,9 @@ def periksa_pilihan_klasifikasi(
     return None
 
 
-def periksa_konfirmasi_penghapusan(id_indikator: str, konfirmasi: str) -> Penolakan | None:
-    if konfirmasi != id_indikator:
-        return Penolakan(400, f"Ketik {id_indikator} sebagai konfirmasi penghapusan")
+def periksa_konfirmasi_penghapusan(konfirmasi: bool) -> Penolakan | None:
+    if not konfirmasi:
+        return Penolakan(400, "Penghapusan indikator harus dikonfirmasi")
     return None
 
 

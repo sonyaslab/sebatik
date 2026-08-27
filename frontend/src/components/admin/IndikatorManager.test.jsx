@@ -96,11 +96,13 @@ describe('IndikatorManager', () => {
     render(<IndikatorManager />)
     await act(async () => {})
 
-    await act(async () => wadah.querySelector('[data-uji="hapus-ISV-999"]').click())
-    expect(wadah.textContent).toContain('Apakah Anda yakin ingin menghapus?')
-    await act(async () => wadah.querySelector('.indicator-confirm-delete').click())
+    const tombolHapus = wadah.querySelector('[data-uji="hapus-ISV-999"]')
+    expect(tombolHapus.disabled).toBe(false)
+    await act(async () => tombolHapus.click())
+    expect(document.body.textContent).toContain('Hapus indikator?')
+    await act(async () => document.body.querySelector('.indicator-confirm-delete').click())
 
-    expect(hapus).toHaveBeenCalledWith('ISV-999', 'ISV-999')
+    expect(hapus).toHaveBeenCalledWith('ISV-999', true)
   })
 
   it('mengambil detail lengkap sebelum membuka form edit', async () => {

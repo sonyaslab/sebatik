@@ -3312,23 +3312,43 @@ html:has(.home-app) { scroll-snap-type: y proximity; }
 .indicator-form-actions button { min-width: 112px; padding: 11px 18px; border-radius: var(--r-sm); font-weight: 900; }
 .indicator-cancel { border: 1px solid var(--danger); background: var(--danger-soft); color: var(--danger); }
 .indicator-save { border: 1px solid var(--success); background: var(--success); color: #fff; }
+.indicator-edit-button, .indicator-delete-button {
+  position:relative; z-index:2; display:inline-grid !important; place-items:center;
+  width:36px; min-width:36px; height:36px; padding:0 !important;
+  pointer-events:auto !important; cursor:pointer;
+}
 .indicator-edit-button { color: var(--warn) !important; border-color: color-mix(in srgb, var(--warn) 45%, var(--line)) !important; background: var(--warn-soft) !important; }
-.indicator-delete-button { color: var(--danger) !important; border-color: color-mix(in srgb, var(--danger) 45%, var(--line)) !important; background: var(--danger-soft) !important; }
+.indicator-delete-button {
+  color:var(--danger) !important; border-color:color-mix(in srgb,var(--danger) 45%,var(--line)) !important;
+  background:var(--danger-soft) !important;
+}
+.indicator-edit-button > svg, .indicator-delete-button > svg { pointer-events:none; }
 .indicator-edit-button:hover, .indicator-delete-button:hover { filter: brightness(.96); }
 .indicator-delete-button:disabled { opacity: .42; cursor: not-allowed; transform: none !important; }
-.indicator-delete-backdrop { position:fixed; inset:0; z-index:1000; display:grid; place-items:center; padding:20px; background:rgba(15,23,42,.55); backdrop-filter:blur(3px); }
-.indicator-delete-dialog { width:min(460px,100%); padding:28px; border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); box-shadow:0 24px 70px rgba(15,23,42,.3); text-align:center; }
-.indicator-delete-icon { width:52px; height:52px; margin:0 auto 16px; display:grid; place-items:center; border-radius:50%; background:var(--danger-soft); color:var(--danger); }
-.indicator-delete-dialog h2 { margin:0; font-size:var(--fs-lg); }
-.indicator-delete-dialog p { margin:12px 0 0; color:var(--muted); line-height:var(--lh-normal); }
-.indicator-delete-actions { display:flex; justify-content:center; gap:12px; margin-top:24px; }
+.indicator-delete-notification {
+  position:fixed; right:24px; bottom:24px; z-index:1000; width:min(440px,calc(100vw - 32px));
+  animation:indicator-notification-in .2s var(--ease) both;
+}
+.indicator-delete-dialog {
+  display:grid; grid-template-columns:auto 1fr; gap:12px 14px; padding:20px;
+  border:1px solid color-mix(in srgb,var(--danger) 25%,var(--line)); border-radius:var(--r-lg);
+  background:var(--surface); box-shadow:0 18px 45px rgba(15,23,42,.22); text-align:left;
+}
+.indicator-delete-icon { width:42px; height:42px; display:grid; place-items:center; border-radius:50%; background:var(--danger-soft); color:var(--danger); }
+.indicator-delete-copy { min-width:0; }
+.indicator-delete-dialog h2 { margin:1px 0 0; font-size:var(--fs-md); }
+.indicator-delete-dialog p { margin:6px 0 0; color:var(--muted); font-size:var(--fs-sm); line-height:var(--lh-normal); }
+.indicator-delete-actions { grid-column:1 / -1; display:flex; justify-content:flex-end; gap:10px; margin-top:4px; }
+.indicator-delete-dialog .indicator-cancel { min-height:42px; padding:0 18px; border-color:var(--success); background:var(--success); color:#fff; font-weight:800; }
 .indicator-confirm-delete { min-height:42px; padding:0 18px; border:1px solid var(--danger); border-radius:var(--r-sm); background:var(--danger); color:white; font-weight:800; }
 .indicator-confirm-delete:hover:not(:disabled) { filter:brightness(.9); }
+@keyframes indicator-notification-in { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
 @media (max-width: 760px) {
   .indicator-form-grid { grid-template-columns: 1fr; }
   .indicator-field-wide { grid-column: auto; }
   .indicator-form-section { padding: var(--sp-4); }
   .indicator-form-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .indicator-delete-notification { right:16px; bottom:16px; }
 }
 .file-field {
   border: 1px dashed color-mix(in srgb, var(--brand) 42%, var(--line));

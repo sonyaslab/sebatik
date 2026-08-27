@@ -1,4 +1,5 @@
 import {useEffect, useState} from 'react'
+import {createPortal} from 'react-dom'
 import {Info, Pencil, Plus, ShieldCheck, Trash2} from 'lucide-react'
 import {EmptyState, Panel} from '../../ui'
 import {
@@ -273,8 +274,8 @@ export function IndikatorManager() {
     const row = pendingDelete
     setDeleting(true)
     try {
-      // Backend tetap mewajibkan ID yang cocok sebagai lapis keamanan kedua.
-      await hapusIndikatorAdmin(row.id_indikator, row.id_indikator)
+      // Backend hanya menerima penghapusan yang membawa persetujuan eksplisit.
+      await hapusIndikatorAdmin(row.id_indikator, true)
       setMessage(`Indikator ${row.id_indikator} dihapus.`)
       setPendingDelete(null)
       load()
@@ -356,6 +357,7 @@ export function IndikatorManager() {
                   <td>
                     <div className="row-actions">
                       <button
+                        type="button"
                         className="indicator-edit-button"
                         data-uji={`edit-${row.id_indikator}`}
                         onClick={() => openEdit(row)}
@@ -364,13 +366,18 @@ export function IndikatorManager() {
                         <Pencil size={14} />
                       </button>
                       <button
+                        type="button"
                         className="indicator-delete-button"
                         data-uji={`hapus-${row.id_indikator}`}
-                        onClick={() => setPendingDelete(row)}
+                        onClick={event => {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          setPendingDelete(row)
+                        }}
                         title="Hapus indikator"
                         aria-label={`Hapus ${row.id_indikator}`}
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={16} aria-hidden="true" />
                       </button>
                     </div>
                   </td>
@@ -383,15 +390,17 @@ export function IndikatorManager() {
         <EmptyState title="Belum ada indikator" desc="Tambahkan indikator pertama lewat tombol di atas." />
       )}
 
-      {pendingDelete && (
-        <div className="indicator-delete-backdrop" role="presentation">
-          <section className="indicator-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="indicator-delete-title">
+      {pendingDelete && createPortal(
+        <div className="indicator-delete-notification" role="presentation">
+          <section className="indicator-delete-dialog" role="alertdialog" aria-labelledby="indicator-delete-title" aria-describedby="indicator-delete-description">
             <span className="indicator-delete-icon"><Trash2 size={22} /></span>
-            <h2 id="indicator-delete-title">Apakah Anda yakin ingin menghapus?</h2>
-            <p>
+            <div className="indicator-delete-copy">
+              <h2 id="indicator-delete-title">Hapus indikator?</h2>
+              <p id="indicator-delete-description">
               Indikator <b>{pendingDelete.id_indikator}</b> — {pendingDelete.nama_indikator} beserta
               histori nilai dan usulan terkait akan dihapus permanen.
-            </p>
+              </p>
+            </div>
             <div className="indicator-delete-actions">
               <button type="button" className="indicator-cancel" onClick={() => setPendingDelete(null)} disabled={deleting}>Batal</button>
               <button type="button" className="indicator-confirm-delete" onClick={remove} disabled={deleting}>
@@ -399,7 +408,8 @@ export function IndikatorManager() {
               </button>
             </div>
           </section>
-        </div>
+        </div>,
+        document.body,
       )}
     </Panel>
   )

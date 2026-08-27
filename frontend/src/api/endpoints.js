@@ -64,8 +64,8 @@ export const buatIndikatorAdmin = form =>
   request(`${V1}/admin/indikator`, {method: 'POST', body: form, ...wajib})
 export const perbaruiIndikatorAdmin = (id, form) =>
   request(`${V1}/admin/indikator/${id}`, {method: 'PUT', body: form, ...wajib})
-export const hapusIndikatorAdmin = (id, konfirmasi) =>
-  request(`${V1}/admin/indikator/${id}?konfirmasi=${encodeURIComponent(konfirmasi)}`, {
+export const hapusIndikatorAdmin = (id, konfirmasi = true) =>
+  request(`${V1}/admin/indikator/${id}?konfirmasi=${konfirmasi}`, {
     method: 'DELETE',
     ...wajib,
   })

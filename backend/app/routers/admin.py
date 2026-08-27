@@ -228,11 +228,11 @@ def perbarui_indikator_admin(
 @router.delete("/admin/indikator/{id_indikator}", response_model=StatusResponse)
 def hapus_indikator_admin(
     id_indikator: str,
-    konfirmasi: str = Query(""),
+    konfirmasi: bool = Query(False),
     admin: ProfilPengguna = Depends(hanya_admin),
     session: Session = Depends(get_session),
 ) -> dict[str, str]:
-    penolakan = svc_indikator.periksa_konfirmasi_penghapusan(id_indikator, konfirmasi)
+    penolakan = svc_indikator.periksa_konfirmasi_penghapusan(konfirmasi)
     if penolakan:
         raise HTTPException(penolakan.kode, penolakan.pesan)
     indikator = repo_indikator.ambil(session, id_indikator)

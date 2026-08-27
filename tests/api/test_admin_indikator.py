@@ -158,7 +158,7 @@ def test_hapus_ikut_membuang_histori_nilainya(client, auth):
     )
     assert usulan.status_code == 200, usulan.text
 
-    response = client.delete("/api/v1/admin/indikator/ISV-993", params={"konfirmasi": "ISV-993"}, headers=auth)
+    response = client.delete("/api/v1/admin/indikator/ISV-993", params={"konfirmasi": True}, headers=auth)
     assert response.status_code == 200, response.text
     assert client.get("/api/v1/admin/indikator/ISV-993", headers=auth).status_code == 404
 
@@ -171,17 +171,17 @@ def test_hapus_tidak_menyentuh_indikator_lain(client, auth):
 def test_hapus_tanpa_konfirmasi_ditolak(client, auth):
     response = client.delete("/api/v1/admin/indikator/ISV-999", headers=auth)
     assert response.status_code == 400
-    assert "konfirmasi penghapusan" in response.json()["detail"]
+    assert "harus dikonfirmasi" in response.json()["detail"]
 
 
 def test_hapus_dengan_konfirmasi_salah_ditolak(client, auth):
-    response = client.delete("/api/v1/admin/indikator/ISV-999", params={"konfirmasi": "ISV-000"}, headers=auth)
+    response = client.delete("/api/v1/admin/indikator/ISV-999", params={"konfirmasi": False}, headers=auth)
     assert response.status_code == 400
     assert client.get("/api/v1/admin/indikator/ISV-999", headers=auth).status_code == 200
 
 
 def test_hapus_berhasil_saat_tidak_punya_nilai(client, auth):
-    response = client.delete("/api/v1/admin/indikator/ISV-999", params={"konfirmasi": "ISV-999"}, headers=auth)
+    response = client.delete("/api/v1/admin/indikator/ISV-999", params={"konfirmasi": True}, headers=auth)
     assert response.status_code == 200
     assert response.json() == {"status": "DIHAPUS"}
 
@@ -190,7 +190,7 @@ def test_hapus_berhasil_saat_tidak_punya_nilai(client, auth):
 
 
 def test_hapus_404_untuk_id_tidak_ada(client, auth):
-    response = client.delete("/api/v1/admin/indikator/ISV-999", params={"konfirmasi": "ISV-999"}, headers=auth)
+    response = client.delete("/api/v1/admin/indikator/ISV-999", params={"konfirmasi": True}, headers=auth)
     assert response.status_code == 404
 
 
@@ -222,7 +222,7 @@ def test_hapus_ikut_membuang_usulan_terkait(client, auth):
     )
     assert usulan.status_code == 200, usulan.text
 
-    response = client.delete("/api/v1/admin/indikator/ISV-997", params={"konfirmasi": "ISV-997"}, headers=auth)
+    response = client.delete("/api/v1/admin/indikator/ISV-997", params={"konfirmasi": True}, headers=auth)
     assert response.status_code == 200, response.text
     assert client.get("/api/v1/admin/indikator/ISV-997", headers=auth).status_code == 404
 
@@ -245,7 +245,7 @@ def test_hapus_tetap_bisa_setelah_indikator_pernah_disunting(client, auth):
     )
     assert ubah.status_code == 200, ubah.text
 
-    response = client.delete("/api/v1/admin/indikator/ISV-996", params={"konfirmasi": "ISV-996"}, headers=auth)
+    response = client.delete("/api/v1/admin/indikator/ISV-996", params={"konfirmasi": True}, headers=auth)
     assert response.status_code == 200, response.text
     assert client.get("/api/v1/admin/indikator/ISV-996", headers=auth).status_code == 404
 
@@ -274,7 +274,7 @@ def test_buat_indikator_menerima_kolom_angka_opsional_kosong(client, auth):
     assert detail["tahun_terakhir"] is None
     assert detail["satuan"] is None
 
-    client.delete("/api/v1/admin/indikator/ISV-995", params={"konfirmasi": "ISV-995"}, headers=auth)
+    client.delete("/api/v1/admin/indikator/ISV-995", params={"konfirmasi": True}, headers=auth)
 
 
 def test_perbarui_indikator_menerima_tahun_terakhir_kosong(client, auth):
@@ -297,4 +297,4 @@ def test_perbarui_indikator_menerima_tahun_terakhir_kosong(client, auth):
     assert response.status_code == 200, response.text
     assert client.get("/api/v1/admin/indikator/ISV-994", headers=auth).json()["tahun_terakhir"] is None
 
-    client.delete("/api/v1/admin/indikator/ISV-994", params={"konfirmasi": "ISV-994"}, headers=auth)
+    client.delete("/api/v1/admin/indikator/ISV-994", params={"konfirmasi": True}, headers=auth)
