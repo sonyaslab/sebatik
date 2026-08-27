@@ -2,9 +2,26 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from typing import Annotated, Any
+
+from pydantic import BaseModel, BeforeValidator
 
 from .capaian import MuatanCapaian
+
+
+def _kosong_jadi_none(nilai: Any) -> Any:
+    """Isian yang dikosongkan di form terkirim sebagai "", bukan sebagai absen.
+
+    Tanpa ini, membiarkan kolom angka opsional kosong — kasus yang paling
+    lazim — membuat Pydantic menolak seluruh form dengan 422 int_parsing.
+    """
+    if isinstance(nilai, str) and nilai.strip() == "":
+        return None
+    return nilai
+
+
+# Kolom angka opsional pada form admin: "" dari form berarti "kosongkan".
+OpsionalInt = Annotated[int | None, BeforeValidator(_kosong_jadi_none)]
 
 
 class IndikatorPublik(BaseModel):
@@ -138,7 +155,7 @@ class IndikatorFormDasar(BaseModel):
     status_ketersediaan: str | None = None
     status_metadata: str | None = None
     periode_data: str | None = None
-    tahun_terakhir: int | None = None
+    tahun_terakhir: OpsionalInt = None
     is_proxy: bool = False
     nama_proxy: str | None = None
     status_rpjmd: str | None = None
