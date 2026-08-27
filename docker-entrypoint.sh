@@ -48,5 +48,11 @@ while [ "$i" -le "$attempts" ]; do
   sleep 3
 done
 
+# Seed indikator+metadata+nilai baseline sekali di deploy pertama; idempoten
+# lewat cek COUNT di dalam perintahnya sendiri (lihat backend/app/cli.py),
+# jadi aman dipanggil di setiap start container termasuk redeploy.
+echo "[entrypoint] seed indikator (idempoten)..."
+python -m backend.app.cli seed-indikator
+
 echo "[entrypoint] menjalankan server."
 exec "$@"
