@@ -11,14 +11,17 @@ pemasangan::
 from __future__ import annotations
 
 import argparse
+import json
 import secrets
 import string
 import sys
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
 from .models import KODE_PROVINSI, Peran, Wilayah
+from .repositories import indikator as repo_indikator
 from .repositories import pengguna as repo_pengguna
 from .repositories import wilayah as repo_wilayah
 from .security import hash_password
@@ -39,6 +42,31 @@ WILAYAH_KALTARA: tuple[tuple[str, str, str, str | None], ...] = (
 
 # Dua slot operator per wilayah, sesuai pemasangan yang berjalan sekarang.
 OPERATOR_PER_WILAYAH = 2
+
+# Fixture di-generate scripts/ekspor_seed_indikator.py dari Excel klasifikasi
+# ISV/IUP, di-commit ke git supaya deploy tidak butuh Excel sama sekali.
+BERKAS_SEED_INDIKATOR = Path(__file__).resolve().parent / "data" / "indikator_seed.json"
+
+
+def seed_indikator(session: Session, berkas: Path = BERKAS_SEED_INDIKATOR) -> int:
+    """Isi indikator+metadata+nilai baseline dari fixture bila tabel kosong.
+
+    Idempoten: mengembalikan 0 tanpa melakukan apa pun bila `indikator`
+    sudah berisi baris apa pun — supaya redeploy tidak menduplikasi data.
+    Tidak melakukan commit, sama seperti `pastikan_wilayah`/`seed_akun`.
+    """
+    if repo_indikator.jumlah(session) > 0:
+        return 0
+
+    muatan = json.loads(berkas.read_text(encoding="utf-8"))
+    repo_indikator.seed_massal(
+        session,
+        indikator=muatan["indikator"],
+        metadata=muatan["metadata_indikator"],
+        nilai=muatan["nilai_indikator"],
+    )
+    session.flush()
+    return len(muatan["indikator"])
 
 
 def sandi_acak(panjang: int = PANJANG_SANDI_SEED) -> str:
@@ -114,6 +142,17 @@ def perintah_seed(tampilkan_sandi: bool) -> int:
         return 0
 
 
+def perintah_seed_indikator() -> int:
+    with SessionLocal() as session:
+        jumlah = seed_indikator(session)
+        if jumlah == 0:
+            print("Tabel indikator sudah terisi; seed dilewati.")
+            return 0
+        session.commit()
+        print(f"Seed indikator selesai: {jumlah} indikator + nilai baseline ditambahkan.")
+        return 0
+
+
 def perintah_periksa() -> int:
     """Ringkasan cepat kesiapan basis data."""
     with SessionLocal() as session:
@@ -139,10 +178,16 @@ def main(argv: list[str] | None = None) -> int:
         help="cetak sandi awal ke layar (hanya di terminal yang aman)",
     )
     sub.add_parser("periksa", help="ringkasan kesiapan basis data")
+    sub.add_parser(
+        "seed-indikator",
+        help="isi indikator+metadata+nilai baseline dari fixture bila tabel indikator kosong",
+    )
 
     argumen = parser.parse_args(argv)
     if argumen.perintah == "seed":
         return perintah_seed(argumen.tampilkan_sandi)
+    if argumen.perintah == "seed-indikator":
+        return perintah_seed_indikator()
     return perintah_periksa()
 
 

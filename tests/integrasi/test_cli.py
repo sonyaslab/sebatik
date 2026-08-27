@@ -76,3 +76,57 @@ def test_operator_terhubung_ke_wilayahnya(session, kode: str, nama: str):
     akun = repo_pengguna.ambil_untuk_login(session, f"operator.{kode}.1")
     assert akun.wilayah_kode == kode
     assert nama in akun.nama
+
+
+def test_seed_indikator_mengisi_saat_kosong(session, tmp_path):
+    import json
+
+    from backend.app.cli import seed_indikator
+    from backend.app.repositories import indikator as repo_indikator
+
+    berkas = tmp_path / "seed.json"
+    berkas.write_text(
+        json.dumps(
+            {
+                "indikator": [{"id_indikator": "ISV-001", "kategori": "ISV", "nomor": 1, "nama_indikator": "Contoh"}],
+                "metadata_indikator": [{"id_indikator": "ISV-001"}],
+                "nilai_indikator": [
+                    {
+                        "id_indikator": "ISV-001",
+                        "wilayah_kode": "65",
+                        "tahun": 2021,
+                        "jenis": "realisasi",
+                        "nilai": 100.0,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    jumlah = seed_indikator(session, berkas)
+
+    assert jumlah == 1
+    assert repo_indikator.jumlah(session) == 1
+
+
+def test_seed_indikator_dilewati_saat_sudah_terisi(session, tmp_path):
+    import json
+
+    from backend.app.cli import seed_indikator
+    from backend.app.models import Indikator
+    from backend.app.repositories import indikator as repo_indikator
+
+    session.add(Indikator(id_indikator="ISV-001", kategori="ISV", nomor=1, nama_indikator="Sudah ada"))
+    session.flush()
+
+    berkas = tmp_path / "seed.json"
+    berkas.write_text(
+        json.dumps({"indikator": [], "metadata_indikator": [], "nilai_indikator": []}),
+        encoding="utf-8",
+    )
+
+    jumlah = seed_indikator(session, berkas)
+
+    assert jumlah == 0
+    assert repo_indikator.jumlah(session) == 1
