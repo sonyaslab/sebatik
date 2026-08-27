@@ -9,6 +9,7 @@ import {OperatorFlow} from '../components/admin/OperatorFlow'
 import {PasswordResetModal} from '../components/admin/PasswordResetModal'
 import {IndikatorManager} from '../components/admin/IndikatorManager'
 import {SubmissionTable} from '../components/admin/SubmissionTable'
+import {UnggahExcelPanel} from '../components/admin/UnggahExcelPanel'
 import {LoginShell} from '../components/layout/LoginShell'
 import {Shell} from '../components/layout/Shell'
 import {usePageTitle} from '../hooks/usePageTitle'
@@ -274,6 +275,8 @@ export default function AdminPage(){
           </table>
         </div>
       </Panel>
+
+      <UnggahExcelPanel onNotify={notify} onSelesai={refresh}/>
     </>}
 
     {me?.peran==='OPERATOR'&&

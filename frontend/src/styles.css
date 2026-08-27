@@ -4138,6 +4138,26 @@ html:has(.home-app) { scroll-snap-type: y proximity; }
 }
 
 /* Cetak: buang chrome, biarkan data yang tersisa */
+/* --- Panel unggah Excel indikator ---------------------------------------- */
+/* Seluruh warna memakai token yang sudah ada; badge konflik meminjam
+   `indicator-state proxy` supaya bahasanya sama dengan tabel indikator. */
+.unggah-diff { display: grid; gap: var(--sp-3); margin-top: var(--sp-3); }
+.unggah-diff h4 {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-body);
+  color: var(--text-1);
+}
+/* Baris yang dilindungi diberi pita kiri supaya terbaca sebagai "tidak
+   ditimpa", bukan sekadar baris tabel biasa. */
+.unggah-konflik .workspace-table tbody tr td:first-child {
+  border-left: 3px solid var(--info);
+  padding-left: var(--sp-2);
+}
+.unggah-riwayat { margin-top: var(--sp-4); }
+
 @media print {
   .topbar, .nav-drawer, .aurora, .batik-layer, .wave-edge, .download-actions, .filters,
   .home-hero-media, .home-hero-veil, .footer-map iframe { display: none !important; }

@@ -137,3 +137,32 @@ def test_loader_tidak_menimpa_nilai_lama_yang_dilindungi(session):
     session.flush()
 
     assert session.query(NilaiIndikator).one().nilai == 99.9
+
+
+def test_nilai_digabung_lewat_kode_bukan_id_indikator():
+    """Kedua sheet berbeda penomoran IUP; kunci gabung wajib (kategori, kode).
+
+    Baris nilai di bawah memakai ID "IUP-011" seperti di berkas nyata, padahal
+    indikator berkode "11" di sheet master adalah "IUP-011"... sedangkan baris
+    ber-ID "IUP-011" itu sebenarnya milik indikator berkode "1". Tanpa gabung
+    lewat kode, nilainya menempel ke indikator yang salah tanpa galat apa pun.
+    """
+    sumber = sumber_database()
+    sumber["sheets"]["Data Target-Realisasi"].append(
+        ["IUP-050", "ISV", "Kelompok", "2", "Nama menyesatkan", "Realisasi", 2024, 3.3, None, None]
+    )
+    dataset = transformasi_sumber_database(sumber)
+    cocok = [b for b in dataset["data"]["nilai_indikator"] if b["tahun"] == 2024]
+
+    assert len(cocok) == 1
+    # kategori ISV + kode "2" -> ISV-002, bukan IUP-050 dari kolom ID.
+    assert cocok[0]["id_indikator"] == "ISV-002"
+
+
+def test_kode_nilai_yang_tidak_dikenal_menggagalkan_transformasi():
+    sumber = sumber_database()
+    sumber["sheets"]["Data Target-Realisasi"].append(
+        ["ISV-001", "ISV", "Kelompok", "9999", "Tidak dikenal", "Realisasi", 2024, 1.0, None, None]
+    )
+    with pytest.raises(DatasetTidakValid, match="tidak ada di sheet master"):
+        transformasi_sumber_database(sumber)

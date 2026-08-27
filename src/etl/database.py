@@ -63,7 +63,19 @@ def _checksum_json(muatan: Any) -> str:
 
 
 def transformasi_sumber_database(isi: dict[str, Any]) -> dict[str, Any]:
-    """Ubah ekspor workbook terklasifikasi menjadi bentuk tabel aplikasi."""
+    """Ubah ekspor workbook terklasifikasi menjadi bentuk tabel aplikasi.
+
+    Kedua sheet digabung lewat `(Kategori, Kode Indikator)`, BUKAN lewat
+    "ID Indikator". Penomoran IUP di sheet `Data Target-Realisasi` berbeda dari
+    sheet `Basis Data Indikator`: dari 71 ID yang muncul di keduanya hanya 10
+    (semuanya ISV) yang benar-benar indikator yang sama. Menggabungkan lewat ID
+    menempelkan realisasi ke indikator yang salah tanpa galat apa pun — mis.
+    "Harapan lama sekolah" menerima angka 73,5 milik "Usia Harapan Hidup".
+
+    `(Kategori, Kode Indikator)` unik untuk seluruh 86 baris master dan
+    memetakan seluruh baris nilai berkas nyata; kunci yang tidak dikenal
+    menggagalkan transformasi, bukan dilewati diam-diam.
+    """
     sheets = isi.get("sheets")
     if not isinstance(sheets, dict):
         raise DatasetTidakValid("Kunci 'sheets' tidak ditemukan")
@@ -76,6 +88,11 @@ def transformasi_sumber_database(isi: dict[str, Any]) -> dict[str, Any]:
     indikator: list[dict[str, Any]] = []
     metadata: list[dict[str, Any]] = []
     terlihat: set[str] = set()
+    # (kategori, kode) -> id_indikator. Sheet nilai TIDAK boleh digabung lewat
+    # "ID Indikator": kedua sheet memakai penomoran IUP yang berbeda, sehingga
+    # ID yang sama menunjuk indikator yang berlainan. Lihat catatan di
+    # `_indeks_kanonis` di bawah.
+    indeks_kode: dict[tuple[str, str], str] = {}
     for baris in master:
         iid = _teks(baris.get("ID Indikator"))
         if not iid or not POLA_ID.fullmatch(iid):
@@ -84,6 +101,9 @@ def transformasi_sumber_database(isi: dict[str, Any]) -> dict[str, Any]:
             continue
         terlihat.add(iid)
         kategori, nomor = iid.split("-", 1)
+        kode_master = _teks(baris.get("Kode Indikator"))
+        if kode_master:
+            indeks_kode[(kategori, kode_master)] = iid
         indikator.append(
             {
                 "id_indikator": iid,
@@ -125,11 +145,21 @@ def transformasi_sumber_database(isi: dict[str, Any]) -> dict[str, Any]:
 
     nilai: list[dict[str, Any]] = []
     kunci_nilai: set[tuple[str, int, str]] = set()
+    tak_dikenal: set[tuple[str, str]] = set()
     for baris in sumber_nilai:
-        iid = _teks(baris.get("ID Indikator"))
+        if not _teks(baris.get("ID Indikator")):
+            continue
+        kunci_kode = (
+            (_teks(baris.get("Kategori")) or "").upper(),
+            _teks(baris.get("Kode Indikator")) or "",
+        )
+        iid = indeks_kode.get(kunci_kode)
         jenis = (_teks(baris.get("Jenis Nilai")) or "").casefold()
         tahun_angka = _angka(baris.get("Tahun"))
-        if iid not in terlihat or jenis not in JENIS_NILAI or tahun_angka is None:
+        if iid is None:
+            tak_dikenal.add(kunci_kode)
+            continue
+        if jenis not in JENIS_NILAI or tahun_angka is None:
             continue
         tahun = int(tahun_angka)
         kunci = (iid, tahun, jenis)
@@ -153,6 +183,11 @@ def transformasi_sumber_database(isi: dict[str, Any]) -> dict[str, Any]:
                 "sumber": _teks(isi.get("source")) or "dataset-database",
                 "status_verifikasi": STATUS_DISETUJUI,
             }
+        )
+
+    if tak_dikenal:
+        raise DatasetTidakValid(
+            f"Baris nilai memakai (Kategori, Kode Indikator) yang tidak ada di sheet master: {sorted(tak_dikenal)[:10]}"
         )
 
     data = {"indikator": indikator, "metadata_indikator": metadata, "nilai_indikator": nilai}

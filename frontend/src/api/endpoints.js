@@ -69,5 +69,6 @@ export const pratinjauUnggahan = form =>
   request(`${V1}/admin/unggah/pratinjau`, {method: 'POST', body: form, ...wajib})
 export const setujuiUnggahan = id =>
   request(`${V1}/admin/unggah/${id}/setujui`, {method: 'POST', ...wajib})
+export const riwayatUnggahan = () => request(`${V1}/admin/unggah`, wajib)
 
 export {qs}
