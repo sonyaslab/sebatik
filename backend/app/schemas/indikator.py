@@ -101,3 +101,138 @@ class ArahBaikResponse(BaseModel):
     status: str
     id_indikator: str
     arah_baik: str
+
+
+class IndikatorFormDasar(BaseModel):
+    """Field yang bisa diisi/diedit admin lewat form CRUD.
+
+    Dipakai dua kali: `IndikatorFormBuat` (create, + id_indikator) dan
+    langsung sebagai body `PUT` (update, id_indikator datang dari path,
+    bukan dari sini — lihat backend/app/routers/admin.py).
+
+    `kategori`+`nomor` tetap wajib diisi bahkan saat update, supaya
+    services.indikator.periksa_konsistensi_id bisa memvalidasi keduanya
+    tetap cocok dengan id_indikator yang sudah ada (id_indikator sendiri
+    tidak pernah bisa diubah setelah dibuat — itu primary key).
+    """
+
+    kategori: str
+    nomor: int
+    nama_indikator: str
+    kode_indikator: str | None = None
+    nama_asli: str | None = None
+    kelompok: str | None = None
+    arah_pembangunan: str | None = None
+    sasaran_visi: str | None = None
+    misi_agenda: str | None = None
+    arah_ie: str | None = None
+    indikator_induk: str | None = None
+    kelompok_makro: str | None = None
+    satuan: str | None = None
+    penghasil: str | None = None
+    kl_pengampu: str | None = None
+    opd_pengampu: str | None = None
+    tim_pjk: str | None = None
+    sumber_data: str | None = None
+    frekuensi: str | None = None
+    status_ketersediaan: str | None = None
+    status_metadata: str | None = None
+    periode_data: str | None = None
+    tahun_terakhir: int | None = None
+    is_proxy: bool = False
+    nama_proxy: str | None = None
+    status_rpjmd: str | None = None
+    kode_sdgs: str | None = None
+    link_metadata: str | None = None
+    link_publikasi: str | None = None
+    link_data: str | None = None
+    catatan_teknis: str | None = None
+    # Field metadata_indikator yang namanya tidak sama dengan kolom indikator
+    # di atas (definisi, sumber_data, frekuensi, status_metadata SUDAH ada
+    # di atas dan ditulis ke dua tabel dengan nilai yang sama).
+    definisi: str | None = None
+    interpretasi: str | None = None
+    rumus: str | None = None
+    rumus_mentah: str | None = None
+    rumus_latex: str | None = None
+    halaman_sumber: str | None = None
+    perlu_verifikasi_manual: bool = False
+    sumber_metadata: str | None = None
+    nama_di_buku1: str | None = None
+
+
+class IndikatorFormBuat(IndikatorFormDasar):
+    id_indikator: str
+
+
+class IndikatorAdminRingkas(BaseModel):
+    """Satu baris daftar admin — seluruh kolom `indikator`, tanpa metadata."""
+
+    id_indikator: str
+    kategori: str
+    nomor: int | None = None
+    kode_indikator: str | None = None
+    nama_indikator: str
+    nama_asli: str | None = None
+    kelompok: str | None = None
+    arah_pembangunan: str | None = None
+    sasaran_visi: str | None = None
+    misi_agenda: str | None = None
+    arah_ie: str | None = None
+    indikator_induk: str | None = None
+    kelompok_makro: str | None = None
+    satuan: str | None = None
+    penghasil: str | None = None
+    kl_pengampu: str | None = None
+    opd_pengampu: str | None = None
+    tim_pjk: str | None = None
+    sumber_data: str | None = None
+    frekuensi: str | None = None
+    status_ketersediaan: str | None = None
+    status_metadata: str | None = None
+    periode_data: str | None = None
+    tahun_terakhir: int | None = None
+    is_proxy: bool
+    nama_proxy: str | None = None
+    status_rpjmd: str | None = None
+    arah_baik: str | None = None
+    arah_baik_terverifikasi: bool
+    kode_sdgs: str | None = None
+    link_metadata: str | None = None
+    link_publikasi: str | None = None
+    link_data: str | None = None
+    catatan_teknis: str | None = None
+    # Dihitung, bukan kolom asli — lihat services.indikator.daftar_admin.
+    # Frontend menonaktifkan tombol hapus saat ini true.
+    punya_nilai: bool
+
+
+class DaftarIndikatorAdminResponse(BaseModel):
+    data: list[IndikatorAdminRingkas]
+    total: int
+    page: int
+    page_size: int
+
+
+class MetadataIndikatorAdmin(BaseModel):
+    definisi: str | None = None
+    interpretasi: str | None = None
+    sumber_data: str | None = None
+    frekuensi: str | None = None
+    rumus: str | None = None
+    rumus_mentah: str | None = None
+    rumus_latex: str | None = None
+    halaman_sumber: str | None = None
+    perlu_verifikasi_manual: bool = False
+    sumber_metadata: str | None = None
+    nama_di_buku1: str | None = None
+    status_metadata: str | None = None
+
+
+class IndikatorAdminDetailResponse(IndikatorAdminRingkas):
+    metadata: MetadataIndikatorAdmin | None = None
+
+
+class IndikatorDibuatResponse(BaseModel):
+    status: str
+    id_indikator: str
