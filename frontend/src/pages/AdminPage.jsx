@@ -7,6 +7,7 @@ import {CheckCircle2, Eye, EyeOff, FileWarning, Info} from 'lucide-react'
 import {useEffect, useState} from 'react'
 import {OperatorFlow} from '../components/admin/OperatorFlow'
 import {PasswordResetModal} from '../components/admin/PasswordResetModal'
+import {IndikatorManager} from '../components/admin/IndikatorManager'
 import {SubmissionTable} from '../components/admin/SubmissionTable'
 import {LoginShell} from '../components/layout/LoginShell'
 import {Shell} from '../components/layout/Shell'
@@ -371,6 +372,8 @@ export default function AdminPage(){
           </table>
         </div>
       </Panel>}
+
+    {me?.peran==='ADMIN'&&<IndikatorManager/>}
 
     {evidence&&
       <div className="evidence-modal" role="dialog" aria-modal="true" onClick={()=>setEvidence(null)}>
