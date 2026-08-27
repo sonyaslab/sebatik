@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from sqlalchemy import Select, asc, desc, func, select
+from sqlalchemy import Select, asc, desc, func, insert, select
 from sqlalchemy.orm import Session
 
-from ..models import Indikator, MetadataIndikator, StatusVerifikasi
+from ..models import Indikator, MetadataIndikator, NilaiIndikator, StatusVerifikasi
 
 # Kolom yang boleh keluar lewat endpoint publik `/indikator`. Nama PIC
 # perorangan dan status ketersediaan sengaja tidak termasuk.
@@ -42,6 +42,32 @@ def ambil_terverifikasi(session: Session, id_indikator: str) -> Indikator | None
 def ada(session: Session, id_indikator: str) -> bool:
     stmt = select(Indikator.id_indikator).where(Indikator.id_indikator == id_indikator)
     return session.scalars(stmt).first() is not None
+
+
+def jumlah(session: Session) -> int:
+    """Jumlah baris `indikator`. Dipakai CLI untuk cek idempotensi seed awal."""
+    return session.scalar(select(func.count()).select_from(Indikator)) or 0
+
+
+def seed_massal(
+    session: Session,
+    indikator: list[dict[str, object]],
+    metadata: list[dict[str, object]],
+    nilai: list[dict[str, object]],
+) -> None:
+    """Insert massal indikator+metadata+nilai dari fixture seed awal.
+
+    Urutan tabel penting: `metadata_indikator` dan `nilai_indikator` punya FK
+    ke `indikator.id_indikator`, jadi `indikator` harus masuk lebih dulu.
+    Tidak melakukan commit — pemanggil (CLI) yang memutuskan kapan commit,
+    sama seperti pola `seed_akun`/`pastikan_wilayah` di `cli.py`.
+    """
+    if indikator:
+        session.execute(insert(Indikator), indikator)
+    if metadata:
+        session.execute(insert(MetadataIndikator), metadata)
+    if nilai:
+        session.execute(insert(NilaiIndikator), nilai)
 
 
 def _saring(
