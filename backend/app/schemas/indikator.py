@@ -231,6 +231,11 @@ class DaftarIndikatorAdminResponse(BaseModel):
     page_size: int
 
 
+class OpsiFormIndikatorResponse(BaseModel):
+    kelompok: list[str]
+    kelompok_makro: list[str]
+
+
 class MetadataIndikatorAdmin(BaseModel):
     definisi: str | None = None
     interpretasi: str | None = None

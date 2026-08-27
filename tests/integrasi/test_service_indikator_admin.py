@@ -56,24 +56,47 @@ def test_periksa_konsistensi_id(id_indikator, kategori, nomor, valid):
         assert penolakan.kode == 422
 
 
-def test_periksa_penghapusan_diizinkan_tanpa_nilai(session):
-    from backend.app.models import Indikator
+def test_periksa_konfirmasi_penghapusan_menolak_teks_yang_tidak_cocok():
+    """Penjaga penghapusan kini konfirmasi eksplisit, bukan larangan sepihak.
 
-    session.add(Indikator(id_indikator="ISV-999", kategori="ISV", nomor=999, nama_indikator="Uji"))
-    session.flush()
-    assert svc.periksa_penghapusan(session, "ISV-999") is None
-
-
-def test_periksa_penghapusan_diblokir_saat_ada_nilai(session):
-    from backend.app.models import Indikator, NilaiIndikator
-
-    session.add(Indikator(id_indikator="ISV-999", kategori="ISV", nomor=999, nama_indikator="Uji"))
-    session.add(NilaiIndikator(id_indikator="ISV-999", wilayah_kode="65", tahun=2021, jenis="realisasi", nilai=1.0))
-    session.flush()
-
-    penolakan = svc.periksa_penghapusan(session, "ISV-999")
+    Admin boleh menghapus indikator berisi nilai; yang wajib adalah menyebut
+    ulang id-nya, supaya penghapusan tidak pernah terjadi karena salah pencet.
+    """
+    penolakan = svc.periksa_konfirmasi_penghapusan("ISV-999", "ISV-000")
     assert penolakan is not None
-    assert penolakan.kode == 409
+    assert penolakan.kode == 400
+
+    assert svc.periksa_konfirmasi_penghapusan("ISV-999", "") is not None
+    assert svc.periksa_konfirmasi_penghapusan("ISV-999", "ISV-999") is None
+
+
+def test_hapus_indikator_membuang_nilai_dan_usulannya(session):
+    """Nilai ikut lewat CASCADE, usulan dibuang service (FK-nya tanpa ON DELETE)."""
+    from backend.app.models import Indikator, NilaiIndikator, UsulanNilai
+
+    _pengguna(session, 1)
+    session.add(Indikator(id_indikator="ISV-999", kategori="ISV", nomor=999, nama_indikator="Uji"))
+    session.flush()
+    session.add(NilaiIndikator(id_indikator="ISV-999", wilayah_kode="65", tahun=2021, jenis="realisasi", nilai=1.0))
+    session.add(
+        UsulanNilai(
+            id_indikator="ISV-999",
+            wilayah_kode="65",
+            tahun=2025,
+            jenis="realisasi",
+            nilai=2.0,
+            sumber="Uji",
+            pengusul_id=1,
+        )
+    )
+    session.flush()
+
+    indikator = session.get(Indikator, "ISV-999")
+    assert svc.hapus_indikator(session, indikator, pengguna_id=1) == {"status": "DIHAPUS"}
+
+    assert session.get(Indikator, "ISV-999") is None
+    assert session.query(NilaiIndikator).filter_by(id_indikator="ISV-999").count() == 0
+    assert session.query(UsulanNilai).filter_by(id_indikator="ISV-999").count() == 0
 
 
 def test_buat_indikator_insert_dan_mencatat_aktivitas(session):

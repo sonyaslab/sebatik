@@ -58,13 +58,17 @@ export const logAudit = () => request(`${V1}/admin/log`, wajib)
 export const koreksiArahBaik = (id, form) =>
   request(`${V1}/arah-baik/${id}`, {method: 'PUT', body: form, ...wajib})
 export const daftarIndikatorAdmin = params => request(denganQuery(`${V1}/admin/indikator`, params), wajib)
+export const opsiFormIndikatorAdmin = () => request(`${V1}/admin/indikator-opsi`, wajib)
 export const detailIndikatorAdmin = id => request(`${V1}/admin/indikator/${id}`, wajib)
 export const buatIndikatorAdmin = form =>
   request(`${V1}/admin/indikator`, {method: 'POST', body: form, ...wajib})
 export const perbaruiIndikatorAdmin = (id, form) =>
   request(`${V1}/admin/indikator/${id}`, {method: 'PUT', body: form, ...wajib})
-export const hapusIndikatorAdmin = id =>
-  request(`${V1}/admin/indikator/${id}`, {method: 'DELETE', ...wajib})
+export const hapusIndikatorAdmin = (id, konfirmasi) =>
+  request(`${V1}/admin/indikator/${id}?konfirmasi=${encodeURIComponent(konfirmasi)}`, {
+    method: 'DELETE',
+    ...wajib,
+  })
 export const pratinjauUnggahan = form =>
   request(`${V1}/admin/unggah/pratinjau`, {method: 'POST', body: form, ...wajib})
 export const setujuiUnggahan = id =>

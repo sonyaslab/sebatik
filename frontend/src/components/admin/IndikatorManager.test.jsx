@@ -1,5 +1,5 @@
 /* @vitest-environment jsdom */
-import {afterEach, describe, expect, it, vi} from 'vitest'
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 import {createRoot} from 'react-dom/client'
 import {act} from 'react'
 
@@ -10,6 +10,15 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 let root
 let wadah
+
+const opsi = {
+  kelompok: ['Transformasi Sosial'],
+  kelompok_makro: ['Non-Makro'],
+}
+
+beforeEach(() => {
+  vi.spyOn(endpoints, 'opsiFormIndikatorAdmin').mockResolvedValue(opsi)
+})
 
 function render(element) {
   wadah = document.createElement('div')
@@ -44,7 +53,7 @@ describe('IndikatorManager', () => {
     expect(wadah.textContent).toContain('Indikator Uji')
   })
 
-  it('menonaktifkan tombol hapus saat indikator punya nilai', async () => {
+  it('tetap mengaktifkan tombol hapus saat indikator punya nilai', async () => {
     vi.spyOn(endpoints, 'daftarIndikatorAdmin').mockResolvedValue({
       data: [{...baris, punya_nilai: true}],
       total: 1,
@@ -54,7 +63,7 @@ describe('IndikatorManager', () => {
     render(<IndikatorManager />)
     await act(async () => {})
     const tombolHapus = wadah.querySelector('[data-uji="hapus-ISV-999"]')
-    expect(tombolHapus.disabled).toBe(true)
+    expect(tombolHapus.disabled).toBe(false)
   })
 
   it('memanggil buatIndikatorAdmin saat form tambah disubmit', async () => {
@@ -72,6 +81,8 @@ describe('IndikatorManager', () => {
     form.querySelector('[name="kategori"]').value = 'ISV'
     form.querySelector('[name="nomor"]').value = '999'
     form.querySelector('[name="nama_indikator"]').value = 'Indikator Uji'
+    form.querySelector('[name="kelompok"]').value = 'Transformasi Sosial'
+    form.querySelector('[name="kelompok_makro"]').value = 'Non-Makro'
 
     await act(async () => form.requestSubmit())
 
@@ -82,13 +93,14 @@ describe('IndikatorManager', () => {
   it('memanggil hapusIndikatorAdmin saat tombol hapus ditekan dan dikonfirmasi', async () => {
     vi.spyOn(endpoints, 'daftarIndikatorAdmin').mockResolvedValue({data: [baris], total: 1, page: 1, page_size: 25})
     const hapus = vi.spyOn(endpoints, 'hapusIndikatorAdmin').mockResolvedValue({status: 'DIHAPUS'})
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<IndikatorManager />)
     await act(async () => {})
 
     await act(async () => wadah.querySelector('[data-uji="hapus-ISV-999"]').click())
+    expect(wadah.textContent).toContain('Apakah Anda yakin ingin menghapus?')
+    await act(async () => wadah.querySelector('.indicator-confirm-delete').click())
 
-    expect(hapus).toHaveBeenCalledWith('ISV-999')
+    expect(hapus).toHaveBeenCalledWith('ISV-999', 'ISV-999')
   })
 
   it('mengambil detail lengkap sebelum membuka form edit', async () => {

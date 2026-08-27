@@ -291,17 +291,31 @@ def periksa_konsistensi_id(id_indikator: str, kategori: str, nomor: int) -> Peno
     return None
 
 
-def periksa_penghapusan(session: Session, id_indikator: str) -> Penolakan | None:
-    """Indikator hanya boleh dihapus bila tidak ada lagi yang mengacunya.
+def opsi_form_admin(session: Session) -> dict[str, list[str]]:
+    return {
+        "kelompok": repo_indikator.pilihan_klasifikasi(session, "kelompok"),
+        "kelompok_makro": repo_indikator.pilihan_klasifikasi(session, "kelompok_makro"),
+    }
 
-    Dua tabel memakai FK tanpa ON DELETE ke `indikator`, jadi keduanya harus
-    diperiksa di sini: tanpa ini basis data yang menolak, dan admin melihat
-    500 alih-alih pesan yang bisa ditindaklanjuti.
-    """
-    if repo_indikator.punya_nilai(session, id_indikator):
-        return Penolakan(409, "Indikator masih punya histori nilai; tidak dapat dihapus")
-    if repo_tata_kelola.punya_usulan(session, id_indikator):
-        return Penolakan(409, "Indikator masih punya usulan nilai; tidak dapat dihapus")
+
+def periksa_pilihan_klasifikasi(
+    session: Session,
+    *,
+    kelompok: str | None,
+    kelompok_makro: str | None,
+) -> Penolakan | None:
+    for label, field, nilai in (
+        ("Kelompok / pilar", "kelompok", kelompok),
+        ("Kelompok makro", "kelompok_makro", kelompok_makro),
+    ):
+        if nilai and nilai not in repo_indikator.pilihan_klasifikasi(session, field):
+            return Penolakan(422, f"{label} tidak termasuk pilihan master")
+    return None
+
+
+def periksa_konfirmasi_penghapusan(id_indikator: str, konfirmasi: str) -> Penolakan | None:
+    if konfirmasi != id_indikator:
+        return Penolakan(400, f"Ketik {id_indikator} sebagai konfirmasi penghapusan")
     return None
 
 
@@ -359,6 +373,7 @@ def hapus_indikator(session: Session, indikator: Indikator, *, pengguna_id: int 
     # dilepaskan (id_indikator dikosongkan), bukan dihapus, supaya riwayat
     # suntingan tetap ada setelah indikatornya hilang.
     repo_tata_kelola.lepaskan_log_perubahan(session, id_indikator)
+    repo_tata_kelola.hapus_usulan_indikator(session, id_indikator)
     repo_indikator.hapus(session, indikator)
     session.commit()
     return {"status": "DIHAPUS"}

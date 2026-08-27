@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session, aliased
 
 from ..models import (
@@ -233,6 +233,16 @@ def punya_usulan(session: Session, id_indikator: str) -> bool:
     """
     stmt = select(UsulanNilai.id).where(UsulanNilai.id_indikator == id_indikator).limit(1)
     return session.scalars(stmt).first() is not None
+
+
+def hapus_usulan_indikator(session: Session, id_indikator: str) -> None:
+    """Hapus usulan sebelum indikator agar FK lama tidak menggagalkan transaksi.
+
+    Bukti dan keputusan verifikasi mengikuti ON DELETE CASCADE, sedangkan
+    nilai yang berasal dari usulan mempertahankan integritas lewat SET NULL.
+    """
+    session.execute(delete(UsulanNilai).where(UsulanNilai.id_indikator == id_indikator))
+    session.flush()
 
 
 def lepaskan_log_perubahan(session: Session, id_indikator: str) -> None:

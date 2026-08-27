@@ -49,6 +49,30 @@ def test_buat_indikator_id_tidak_konsisten_ditolak_422(client, auth):
     assert response.status_code == 422
 
 
+def test_opsi_form_berasal_dari_master(client, auth):
+    response = client.get("/api/v1/admin/indikator-opsi", headers=auth)
+    assert response.status_code == 200
+    body = response.json()
+    assert "Transformasi Sosial" in body["kelompok"]
+    assert isinstance(body["kelompok_makro"], list)
+
+
+def test_pilihan_klasifikasi_di_luar_master_ditolak(client, auth):
+    response = client.post(
+        "/api/v1/admin/indikator",
+        data={
+            "id_indikator": "ISV-993",
+            "kategori": "ISV",
+            "nomor": 993,
+            "nama_indikator": "Pilihan Tidak Sah",
+            "kelompok": "Kelompok Buatan",
+        },
+        headers=auth,
+    )
+    assert response.status_code == 422
+    assert "pilihan master" in response.json()["detail"]
+
+
 def test_buat_indikator_duplikat_ditolak_409(client, auth):
     response = client.post(
         "/api/v1/admin/indikator",
@@ -107,14 +131,57 @@ def test_perbarui_kategori_tidak_konsisten_ditolak_422(client, auth):
     assert response.status_code == 422
 
 
-def test_hapus_diblokir_saat_indikator_punya_nilai(client, auth):
-    # ISV-001 dari _isi_benih() punya banyak baris nilai_indikator.
-    response = client.delete("/api/v1/admin/indikator/ISV-001", headers=auth)
-    assert response.status_code == 409
+def test_hapus_ikut_membuang_histori_nilainya(client, auth):
+    """Indikator berisi nilai TETAP boleh dihapus; konfirmasi yang jadi penjaganya.
+
+    Sengaja memakai ISV-993 buatan sendiri, bukan ISV-001 dari _isi_benih():
+    fixture `client` ber-scope session, jadi menghapus indikator benih akan
+    merusak seluruh tes kontrak yang berjalan sesudahnya.
+    """
+    client.post(
+        "/api/v1/admin/indikator",
+        data={"id_indikator": "ISV-993", "kategori": "ISV", "nomor": 993, "nama_indikator": "Punya Nilai"},
+        headers=auth,
+    )
+    usulan = client.post(
+        "/api/v1/admin/usulan",
+        data={
+            "id_indikator": "ISV-993",
+            "tahun": 2025,
+            "jenis": "realisasi",
+            "nilai": 12.0,
+            "sumber": "Uji",
+            "wilayah_kode": "65",
+        },
+        files={"bukti": ("bukti.pdf", b"%PDF-1.4 uji", "application/pdf")},
+        headers=auth,
+    )
+    assert usulan.status_code == 200, usulan.text
+
+    response = client.delete("/api/v1/admin/indikator/ISV-993", params={"konfirmasi": "ISV-993"}, headers=auth)
+    assert response.status_code == 200, response.text
+    assert client.get("/api/v1/admin/indikator/ISV-993", headers=auth).status_code == 404
+
+
+def test_hapus_tidak_menyentuh_indikator_lain(client, auth):
+    """Penghapusan hanya membuang barisnya sendiri, bukan data benih di sekitarnya."""
+    assert client.get("/api/v1/admin/indikator/ISV-001", headers=auth).status_code == 200
+
+
+def test_hapus_tanpa_konfirmasi_ditolak(client, auth):
+    response = client.delete("/api/v1/admin/indikator/ISV-999", headers=auth)
+    assert response.status_code == 400
+    assert "konfirmasi penghapusan" in response.json()["detail"]
+
+
+def test_hapus_dengan_konfirmasi_salah_ditolak(client, auth):
+    response = client.delete("/api/v1/admin/indikator/ISV-999", params={"konfirmasi": "ISV-000"}, headers=auth)
+    assert response.status_code == 400
+    assert client.get("/api/v1/admin/indikator/ISV-999", headers=auth).status_code == 200
 
 
 def test_hapus_berhasil_saat_tidak_punya_nilai(client, auth):
-    response = client.delete("/api/v1/admin/indikator/ISV-999", headers=auth)
+    response = client.delete("/api/v1/admin/indikator/ISV-999", params={"konfirmasi": "ISV-999"}, headers=auth)
     assert response.status_code == 200
     assert response.json() == {"status": "DIHAPUS"}
 
@@ -123,16 +190,15 @@ def test_hapus_berhasil_saat_tidak_punya_nilai(client, auth):
 
 
 def test_hapus_404_untuk_id_tidak_ada(client, auth):
-    response = client.delete("/api/v1/admin/indikator/ISV-999", headers=auth)
+    response = client.delete("/api/v1/admin/indikator/ISV-999", params={"konfirmasi": "ISV-999"}, headers=auth)
     assert response.status_code == 404
 
 
-def test_hapus_diblokir_saat_indikator_punya_usulan(client, auth):
-    """usulan_nilai.id_indikator FK NOT NULL tanpa ON DELETE — harus 409, bukan 500.
+def test_hapus_ikut_membuang_usulan_terkait(client, auth):
+    """usulan_nilai.id_indikator FK NOT NULL tanpa ON DELETE.
 
-    ISV-997 dibuat khusus di tes ini dan tidak punya baris nilai_indikator
-    sama sekali, jadi yang benar-benar diuji adalah penjaga usulan, bukan
-    penjaga nilai yang sudah diuji di tes sebelumnya.
+    Usulan harus dibuang lebih dulu oleh service; tanpa itu basis data
+    menolak dan admin melihat 500, bukan penghapusan yang berhasil.
     """
     buat = client.post(
         "/api/v1/admin/indikator",
@@ -156,8 +222,9 @@ def test_hapus_diblokir_saat_indikator_punya_usulan(client, auth):
     )
     assert usulan.status_code == 200, usulan.text
 
-    response = client.delete("/api/v1/admin/indikator/ISV-997", headers=auth)
-    assert response.status_code == 409
+    response = client.delete("/api/v1/admin/indikator/ISV-997", params={"konfirmasi": "ISV-997"}, headers=auth)
+    assert response.status_code == 200, response.text
+    assert client.get("/api/v1/admin/indikator/ISV-997", headers=auth).status_code == 404
 
 
 def test_hapus_tetap_bisa_setelah_indikator_pernah_disunting(client, auth):
@@ -178,7 +245,7 @@ def test_hapus_tetap_bisa_setelah_indikator_pernah_disunting(client, auth):
     )
     assert ubah.status_code == 200, ubah.text
 
-    response = client.delete("/api/v1/admin/indikator/ISV-996", headers=auth)
+    response = client.delete("/api/v1/admin/indikator/ISV-996", params={"konfirmasi": "ISV-996"}, headers=auth)
     assert response.status_code == 200, response.text
     assert client.get("/api/v1/admin/indikator/ISV-996", headers=auth).status_code == 404
 
@@ -207,7 +274,7 @@ def test_buat_indikator_menerima_kolom_angka_opsional_kosong(client, auth):
     assert detail["tahun_terakhir"] is None
     assert detail["satuan"] is None
 
-    client.delete("/api/v1/admin/indikator/ISV-995", headers=auth)
+    client.delete("/api/v1/admin/indikator/ISV-995", params={"konfirmasi": "ISV-995"}, headers=auth)
 
 
 def test_perbarui_indikator_menerima_tahun_terakhir_kosong(client, auth):
@@ -230,4 +297,4 @@ def test_perbarui_indikator_menerima_tahun_terakhir_kosong(client, auth):
     assert response.status_code == 200, response.text
     assert client.get("/api/v1/admin/indikator/ISV-994", headers=auth).json()["tahun_terakhir"] is None
 
-    client.delete("/api/v1/admin/indikator/ISV-994", headers=auth)
+    client.delete("/api/v1/admin/indikator/ISV-994", params={"konfirmasi": "ISV-994"}, headers=auth)

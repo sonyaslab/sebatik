@@ -21,6 +21,7 @@ from ..schemas.indikator import (
     IndikatorDibuatResponse,
     IndikatorFormBuat,
     IndikatorFormDasar,
+    OpsiFormIndikatorResponse,
 )
 from ..schemas.umum import StatusResponse
 from ..services import auth as svc_auth
@@ -160,6 +161,14 @@ def daftar_indikator_admin(
     )
 
 
+@router.get("/admin/indikator-opsi", response_model=OpsiFormIndikatorResponse)
+def opsi_form_indikator_admin(
+    admin: ProfilPengguna = Depends(hanya_admin),
+    session: Session = Depends(get_session),
+) -> dict[str, list[str]]:
+    return svc_indikator.opsi_form_admin(session)
+
+
 @router.get("/admin/indikator/{id_indikator}", response_model=IndikatorAdminDetailResponse)
 def detail_indikator_admin(
     id_indikator: str,
@@ -179,6 +188,11 @@ def buat_indikator_admin(
     session: Session = Depends(get_session),
 ) -> dict[str, str]:
     penolakan = svc_indikator.periksa_konsistensi_id(form.id_indikator, form.kategori, form.nomor)
+    if penolakan:
+        raise HTTPException(penolakan.kode, penolakan.pesan)
+    penolakan = svc_indikator.periksa_pilihan_klasifikasi(
+        session, kelompok=form.kelompok, kelompok_makro=form.kelompok_makro
+    )
     if penolakan:
         raise HTTPException(penolakan.kode, penolakan.pesan)
     try:
@@ -202,6 +216,11 @@ def perbarui_indikator_admin(
     penolakan = svc_indikator.periksa_konsistensi_id(id_indikator, form.kategori, form.nomor)
     if penolakan:
         raise HTTPException(penolakan.kode, penolakan.pesan)
+    penolakan = svc_indikator.periksa_pilihan_klasifikasi(
+        session, kelompok=form.kelompok, kelompok_makro=form.kelompok_makro
+    )
+    if penolakan:
+        raise HTTPException(penolakan.kode, penolakan.pesan)
     metadata = repo_indikator.ambil_metadata(session, id_indikator)
     return svc_indikator.perbarui_indikator(session, indikator, metadata, form, pengguna_id=id_terautentikasi(admin))
 
@@ -209,13 +228,14 @@ def perbarui_indikator_admin(
 @router.delete("/admin/indikator/{id_indikator}", response_model=StatusResponse)
 def hapus_indikator_admin(
     id_indikator: str,
+    konfirmasi: str = Query(""),
     admin: ProfilPengguna = Depends(hanya_admin),
     session: Session = Depends(get_session),
 ) -> dict[str, str]:
+    penolakan = svc_indikator.periksa_konfirmasi_penghapusan(id_indikator, konfirmasi)
+    if penolakan:
+        raise HTTPException(penolakan.kode, penolakan.pesan)
     indikator = repo_indikator.ambil(session, id_indikator)
     if indikator is None:
         raise HTTPException(404, "Indikator tidak ditemukan")
-    penolakan = svc_indikator.periksa_penghapusan(session, id_indikator)
-    if penolakan:
-        raise HTTPException(penolakan.kode, penolakan.pesan)
     return svc_indikator.hapus_indikator(session, indikator, pengguna_id=id_terautentikasi(admin))

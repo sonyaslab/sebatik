@@ -1,13 +1,44 @@
 import {useEffect, useState} from 'react'
-import {Pencil, Plus, Trash2} from 'lucide-react'
+import {Info, Pencil, Plus, ShieldCheck, Trash2} from 'lucide-react'
 import {EmptyState, Panel} from '../../ui'
 import {
   buatIndikatorAdmin,
   daftarIndikatorAdmin,
   detailIndikatorAdmin,
   hapusIndikatorAdmin,
+  opsiFormIndikatorAdmin,
   perbaruiIndikatorAdmin,
 } from '../../api/endpoints'
+
+const Field = ({label, wide = false, children}) => (
+  <label className={`indicator-field${wide ? ' indicator-field-wide' : ''}`}>
+    <span>{label}</span>
+    {children}
+  </label>
+)
+
+const FIELD_TERSEMBUNYI = [
+  ['nama_asli', 'nama_asli'],
+  ['status_rpjmd', 'status_rpjmd'],
+  ['kode_sdgs', 'kode_sdgs'],
+  ['link_metadata', 'link_metadata'],
+  ['link_publikasi', 'link_publikasi'],
+  ['link_data', 'link_data'],
+  ['kl_pengampu', 'kl_pengampu'],
+]
+
+function NilaiLamaTersembunyi({editing}) {
+  if (!editing) return null
+  return (
+    <>
+      {FIELD_TERSEMBUNYI.map(([name, key]) => (
+        <input key={name} type="hidden" name={name} value={editing[key] || ''} readOnly />
+      ))}
+      <input type="hidden" name="nama_di_buku1" value={editing.metadata?.nama_di_buku1 || ''} readOnly />
+      <input type="hidden" name="halaman_sumber" value={editing.metadata?.halaman_sumber || ''} readOnly />
+    </>
+  )
+}
 
 /* FastAPI membalas 422 dengan `detail` berupa DAFTAR objek galat
    ({loc, msg, type}), bukan kalimat. Merendernya apa adanya membuat React
@@ -31,7 +62,7 @@ export function pesanGalat(error, cadangan) {
    supaya React membuat instance <form> baru tiap kali baris yang diedit
    berganti atau berpindah ke mode "tambah baru" — cara termurah untuk
    mereset isian tak-terkendali (uncontrolled) tanpa useEffect sinkronisasi. */
-function FormIndikator({editing, onCancel, onSaved, onError}) {
+function FormIndikator({editing, options, onCancel, onSaved, onError}) {
   const [saving, setSaving] = useState(false)
   const isEdit = Boolean(editing)
 
@@ -51,146 +82,145 @@ function FormIndikator({editing, onCancel, onSaved, onError}) {
   }
 
   return (
-    <form className="panel role-form" data-uji="form-indikator" onSubmit={submit}>
-      <h3>{isEdit ? `Edit ${editing.id_indikator}` : 'Tambah indikator baru'}</h3>
+    <form className="indicator-form" data-uji="form-indikator" onSubmit={submit}>
+      <header className="indicator-form-head">
+        <div>
+          <span className="indicator-form-eyebrow">Form indikator</span>
+          <h3>{isEdit ? `Edit ${editing.id_indikator}` : 'Tambah indikator baru'}</h3>
+          <p>Lengkapi informasi utama. Kolom bertanda wajib harus diisi.</p>
+        </div>
+        <ShieldCheck size={24} aria-hidden="true" />
+      </header>
 
-      <fieldset>
+      <NilaiLamaTersembunyi editing={editing} />
+
+      <fieldset className="indicator-form-section">
         <legend>Identitas &amp; klasifikasi</legend>
+        <div className="indicator-form-grid">
         {/* Saat edit, kategori/nomor dikirim sebagai input hidden, bukan
             disabled: input disabled tidak ikut masuk FormData sama sekali,
             sedangkan backend mewajibkan keduanya untuk memverifikasi bahwa
             id_indikator (primary key) tetap konsisten. */}
         {isEdit ? (
-          <div className="form-pair">
+          <div className="indicator-field indicator-field-wide">
             <input type="hidden" name="kategori" value={editing.kategori} readOnly />
             <input type="hidden" name="nomor" value={editing.nomor} readOnly />
+            <span>Identitas indikator</span>
             <span className="locked-field">
               {editing.id_indikator} · {editing.kategori}
             </span>
           </div>
         ) : (
-          <div className="form-pair">
-            <input name="id_indikator" placeholder="mis. ISV-087" required defaultValue="" />
-            <select name="kategori" defaultValue="ISV">
+          <>
+            <Field label="ID indikator *">
+              <input name="id_indikator" placeholder="Contoh: ISV-087" required defaultValue="" />
+            </Field>
+            <Field label="Kategori *">
+              <select name="kategori" defaultValue="ISV">
               <option value="ISV">ISV</option>
               <option value="IUP">IUP</option>
-            </select>
-            <input name="nomor" type="number" min="1" placeholder="Nomor urut" required />
-          </div>
+              </select>
+            </Field>
+            <Field label="Nomor urut *">
+              <input name="nomor" type="number" min="1" placeholder="87" required />
+            </Field>
+          </>
         )}
-        <input
-          name="nama_indikator"
-          placeholder="Nama indikator"
-          required
-          defaultValue={editing?.nama_indikator || ''}
-        />
-        <input name="nama_asli" placeholder="Nama asli (RPJPD)" defaultValue={editing?.nama_asli || ''} />
-        <input name="kode_indikator" placeholder="Kode indikator" defaultValue={editing?.kode_indikator || ''} />
-        <input name="kelompok" placeholder="Kelompok / pilar" defaultValue={editing?.kelompok || ''} />
-        <input
-          name="arah_pembangunan"
-          placeholder="Arah pembangunan (ISV)"
-          defaultValue={editing?.arah_pembangunan || ''}
-        />
-        <input name="arah_ie" placeholder="Arah Indonesia Emas (IUP)" defaultValue={editing?.arah_ie || ''} />
-        <input name="sasaran_visi" placeholder="Sasaran visi" defaultValue={editing?.sasaran_visi || ''} />
-        <input name="misi_agenda" placeholder="Misi / agenda" defaultValue={editing?.misi_agenda || ''} />
-        <input name="indikator_induk" placeholder="Indikator induk" defaultValue={editing?.indikator_induk || ''} />
-        <input name="kelompok_makro" placeholder="Kelompok makro" defaultValue={editing?.kelompok_makro || ''} />
-        <input name="satuan" placeholder="Satuan (mis. Persen (%))" defaultValue={editing?.satuan || ''} />
-        <label className="checkbox-field">
+        <Field label="Nama indikator *" wide>
+          <input name="nama_indikator" required defaultValue={editing?.nama_indikator || ''} />
+        </Field>
+        <Field label="Kode indikator">
+          <input name="kode_indikator" defaultValue={editing?.kode_indikator || ''} />
+        </Field>
+        <Field label="Kelompok / pilar *">
+          <select name="kelompok" required defaultValue={editing?.kelompok || ''}>
+            <option value="">Pilih kelompok / pilar</option>
+            {options.kelompok.map(item => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </Field>
+        <Field label="Kelompok makro *">
+          <select name="kelompok_makro" required defaultValue={editing?.kelompok_makro || ''}>
+            <option value="">Pilih kelompok makro</option>
+            {options.kelompok_makro.map(item => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </Field>
+        <Field label="Arah pembangunan (ISV)">
+          <input name="arah_pembangunan" defaultValue={editing?.arah_pembangunan || ''} />
+        </Field>
+        <Field label="Arah Indonesia Emas (IUP)">
+          <input name="arah_ie" defaultValue={editing?.arah_ie || ''} />
+        </Field>
+        <Field label="Sasaran visi">
+          <input name="sasaran_visi" defaultValue={editing?.sasaran_visi || ''} />
+        </Field>
+        <Field label="Misi / agenda">
+          <input name="misi_agenda" defaultValue={editing?.misi_agenda || ''} />
+        </Field>
+        <Field label="Indikator induk">
+          <input name="indikator_induk" defaultValue={editing?.indikator_induk || ''} />
+        </Field>
+        <Field label="Satuan">
+          <input name="satuan" placeholder="Contoh: Persen (%)" defaultValue={editing?.satuan || ''} />
+        </Field>
+        <label className="indicator-toggle indicator-field-wide">
           <input type="checkbox" name="is_proxy" defaultChecked={editing?.is_proxy || false} />
-          <span>Indikator proxy</span>
+          <span className="indicator-toggle-box" aria-hidden="true" />
+          <span><b>Indikator proxy</b><small>Aktifkan jika indikator ini menggunakan indikator pengganti.</small></span>
         </label>
-        <input
-          name="nama_proxy"
-          placeholder="Nama indikator proxy (bila ada)"
-          defaultValue={editing?.nama_proxy || ''}
-        />
+        <Field label="Nama indikator proxy" wide>
+          <input name="nama_proxy" placeholder="Isi bila indikator proxy diaktifkan" defaultValue={editing?.nama_proxy || ''} />
+        </Field>
+        </div>
       </fieldset>
 
-      <fieldset>
+      <fieldset className="indicator-form-section">
         <legend>Kepemilikan &amp; ketersediaan</legend>
-        <input name="penghasil" placeholder="Penghasil indikator" defaultValue={editing?.penghasil || ''} />
-        <input name="kl_pengampu" placeholder="K/L/D/I pengampu" defaultValue={editing?.kl_pengampu || ''} />
-        <input name="opd_pengampu" placeholder="OPD pengampu (Kaltara)" defaultValue={editing?.opd_pengampu || ''} />
-        <input name="tim_pjk" placeholder="Tim PJK" defaultValue={editing?.tim_pjk || ''} />
-        <input name="sumber_data" placeholder="Sumber data" defaultValue={editing?.sumber_data || ''} />
-        <input name="frekuensi" placeholder="Frekuensi" defaultValue={editing?.frekuensi || ''} />
-        <input
-          name="status_ketersediaan"
-          placeholder="Status ketersediaan data"
-          defaultValue={editing?.status_ketersediaan || ''}
-        />
-        <input name="status_metadata" placeholder="Status metadata" defaultValue={editing?.status_metadata || ''} />
-        <input name="periode_data" placeholder="Periode data" defaultValue={editing?.periode_data || ''} />
-        <input
-          name="tahun_terakhir"
-          type="number"
-          placeholder="Tahun data terakhir"
-          defaultValue={editing?.tahun_terakhir || ''}
-        />
-        <input name="status_rpjmd" placeholder="Status RPJMD" defaultValue={editing?.status_rpjmd || ''} />
-        <input name="kode_sdgs" placeholder="Kode SDGs" defaultValue={editing?.kode_sdgs || ''} />
-        <input name="link_metadata" placeholder="Tautan metadata" defaultValue={editing?.link_metadata || ''} />
-        <input name="link_publikasi" placeholder="Tautan publikasi" defaultValue={editing?.link_publikasi || ''} />
-        <input name="link_data" placeholder="Tautan data" defaultValue={editing?.link_data || ''} />
-        <textarea name="catatan_teknis" placeholder="Catatan teknis" defaultValue={editing?.catatan_teknis || ''} />
+        <div className="indicator-form-grid">
+          <Field label="Penghasil indikator"><input name="penghasil" defaultValue={editing?.penghasil || ''} /></Field>
+          <Field label="OPD pengampu (Kaltara)"><input name="opd_pengampu" defaultValue={editing?.opd_pengampu || ''} /></Field>
+          <Field label="Tim PJK"><input name="tim_pjk" defaultValue={editing?.tim_pjk || ''} /></Field>
+          <Field label="Sumber data"><input name="sumber_data" defaultValue={editing?.sumber_data || ''} /></Field>
+          <Field label="Frekuensi"><input name="frekuensi" defaultValue={editing?.frekuensi || ''} /></Field>
+          <Field label="Status ketersediaan"><input name="status_ketersediaan" defaultValue={editing?.status_ketersediaan || ''} /></Field>
+          <Field label="Status metadata"><input name="status_metadata" defaultValue={editing?.status_metadata || ''} /></Field>
+          <Field label="Periode data"><input name="periode_data" defaultValue={editing?.periode_data || ''} /></Field>
+          <Field label="Tahun data terakhir"><input name="tahun_terakhir" type="number" defaultValue={editing?.tahun_terakhir || ''} /></Field>
+          <Field label="Catatan teknis" wide><textarea name="catatan_teknis" defaultValue={editing?.catatan_teknis || ''} /></Field>
+        </div>
       </fieldset>
 
-      <fieldset>
+      <fieldset className="indicator-form-section">
         <legend>Metadata &amp; definisi</legend>
-        <textarea name="definisi" placeholder="Definisi" defaultValue={editing?.metadata?.definisi || ''} />
-        <textarea
-          name="interpretasi"
-          placeholder="Interpretasi"
-          defaultValue={editing?.metadata?.interpretasi || ''}
-        />
-        <textarea
-          name="rumus"
-          placeholder="Rumus (keterangan notasi)"
-          defaultValue={editing?.metadata?.rumus || ''}
-        />
-        <textarea
-          name="rumus_mentah"
-          placeholder="Rumus perhitungan (mentah)"
-          defaultValue={editing?.metadata?.rumus_mentah || ''}
-        />
-        <input
-          name="rumus_latex"
-          placeholder="Rumus (LaTeX)"
-          defaultValue={editing?.metadata?.rumus_latex || ''}
-        />
-        <input
-          name="halaman_sumber"
-          placeholder="Halaman sumber (Buku 1)"
-          defaultValue={editing?.metadata?.halaman_sumber || ''}
-        />
-        <input
-          name="sumber_metadata"
-          placeholder="Sumber metadata"
-          defaultValue={editing?.metadata?.sumber_metadata || ''}
-        />
-        <input
-          name="nama_di_buku1"
-          placeholder="Nama di Buku 1"
-          defaultValue={editing?.metadata?.nama_di_buku1 || ''}
-        />
-        <label className="checkbox-field">
+        <div className="indicator-form-grid">
+          <Field label="Definisi" wide><textarea name="definisi" defaultValue={editing?.metadata?.definisi || ''} /></Field>
+          <Field label="Interpretasi" wide><textarea name="interpretasi" defaultValue={editing?.metadata?.interpretasi || ''} /></Field>
+          <Field label="Rumus dan keterangan notasi" wide><textarea name="rumus" defaultValue={editing?.metadata?.rumus || ''} /></Field>
+          <Field label="Rumus perhitungan mentah" wide><textarea name="rumus_mentah" defaultValue={editing?.metadata?.rumus_mentah || ''} /></Field>
+          <Field label="Rumus LaTeX"><input name="rumus_latex" defaultValue={editing?.metadata?.rumus_latex || ''} /></Field>
+          <Field label="Sumber metadata"><input name="sumber_metadata" defaultValue={editing?.metadata?.sumber_metadata || ''} /></Field>
+        </div>
+        <div className="manual-verification">
+          <Info size={20} aria-hidden="true" />
+          <div>
+            <label className="indicator-toggle">
           <input
             type="checkbox"
             name="perlu_verifikasi_manual"
             defaultChecked={editing?.metadata?.perlu_verifikasi_manual || false}
           />
-          <span>Perlu verifikasi manual</span>
-        </label>
+              <span className="indicator-toggle-box" aria-hidden="true" />
+              <span><b>Perlu verifikasi manual</b></span>
+            </label>
+            <p>Tandai bila definisi, sumber, atau rumus belum diperiksa petugas dan belum boleh dianggap metadata final.</p>
+          </div>
+        </div>
       </fieldset>
 
-      <div className="row-actions">
-        <button type="button" onClick={onCancel} disabled={saving}>
+      <div className="indicator-form-actions">
+        <button className="indicator-cancel" type="button" onClick={onCancel} disabled={saving}>
           Batal
         </button>
-        <button type="submit" disabled={saving}>
+        <button className="indicator-save" type="submit" disabled={saving}>
           {saving ? 'Menyimpan...' : 'Simpan'}
         </button>
       </div>
@@ -204,12 +234,19 @@ export function IndikatorManager() {
   const [editing, setEditing] = useState(null)
   const [creating, setCreating] = useState(false)
   const [message, setMessage] = useState('')
+  const [options, setOptions] = useState({kelompok: [], kelompok_makro: []})
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   const load = async () => {
     setLoading(true)
     try {
-      const result = await daftarIndikatorAdmin({page_size: 200})
+      const [result, formOptions] = await Promise.all([
+        daftarIndikatorAdmin({page_size: 200}),
+        opsiFormIndikatorAdmin(),
+      ])
       setRows(result.data)
+      setOptions(formOptions)
     } catch (error) {
       setMessage(pesanGalat(error, 'Gagal memuat daftar indikator'))
     } finally {
@@ -231,14 +268,20 @@ export function IndikatorManager() {
     }
   }
 
-  const remove = async row => {
-    if (!confirm(`Hapus indikator ${row.id_indikator}? Tindakan ini tidak dapat dibatalkan.`)) return
+  const remove = async () => {
+    if (!pendingDelete) return
+    const row = pendingDelete
+    setDeleting(true)
     try {
-      await hapusIndikatorAdmin(row.id_indikator)
+      // Backend tetap mewajibkan ID yang cocok sebagai lapis keamanan kedua.
+      await hapusIndikatorAdmin(row.id_indikator, row.id_indikator)
       setMessage(`Indikator ${row.id_indikator} dihapus.`)
+      setPendingDelete(null)
       load()
     } catch (error) {
       setMessage(pesanGalat(error, 'Gagal menghapus indikator'))
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -261,6 +304,7 @@ export function IndikatorManager() {
       desc="Buat, ubah, atau hapus indikator dan metadatanya."
       actions={
         <button
+          className="indicator-add-button"
           data-uji="tombol-tambah"
           onClick={() => {
             setCreating(true)
@@ -276,6 +320,7 @@ export function IndikatorManager() {
       {(creating || editing) && (
         <FormIndikator
           editing={editing}
+          options={options}
           key={editing ? editing.id_indikator : 'baru'}
           onCancel={closeForm}
           onSaved={saved}
@@ -311,6 +356,7 @@ export function IndikatorManager() {
                   <td>
                     <div className="row-actions">
                       <button
+                        className="indicator-edit-button"
                         data-uji={`edit-${row.id_indikator}`}
                         onClick={() => openEdit(row)}
                         aria-label={`Edit ${row.id_indikator}`}
@@ -318,14 +364,10 @@ export function IndikatorManager() {
                         <Pencil size={14} />
                       </button>
                       <button
+                        className="indicator-delete-button"
                         data-uji={`hapus-${row.id_indikator}`}
-                        onClick={() => remove(row)}
-                        disabled={row.punya_nilai}
-                        title={
-                          row.punya_nilai
-                            ? 'Masih punya histori nilai; tidak dapat dihapus'
-                            : 'Hapus indikator'
-                        }
+                        onClick={() => setPendingDelete(row)}
+                        title="Hapus indikator"
                         aria-label={`Hapus ${row.id_indikator}`}
                       >
                         <Trash2 size={14} />
@@ -339,6 +381,25 @@ export function IndikatorManager() {
         </div>
       ) : (
         <EmptyState title="Belum ada indikator" desc="Tambahkan indikator pertama lewat tombol di atas." />
+      )}
+
+      {pendingDelete && (
+        <div className="indicator-delete-backdrop" role="presentation">
+          <section className="indicator-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="indicator-delete-title">
+            <span className="indicator-delete-icon"><Trash2 size={22} /></span>
+            <h2 id="indicator-delete-title">Apakah Anda yakin ingin menghapus?</h2>
+            <p>
+              Indikator <b>{pendingDelete.id_indikator}</b> — {pendingDelete.nama_indikator} beserta
+              histori nilai dan usulan terkait akan dihapus permanen.
+            </p>
+            <div className="indicator-delete-actions">
+              <button type="button" className="indicator-cancel" onClick={() => setPendingDelete(null)} disabled={deleting}>Batal</button>
+              <button type="button" className="indicator-confirm-delete" onClick={remove} disabled={deleting}>
+                {deleting ? 'Menghapus...' : 'Ya, hapus'}
+              </button>
+            </div>
+          </section>
+        </div>
       )}
     </Panel>
   )

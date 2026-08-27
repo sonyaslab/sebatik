@@ -220,6 +220,18 @@ def id_dengan_nilai(session: Session, ids: Sequence[str]) -> set[str]:
     return set(session.scalars(stmt))
 
 
+def pilihan_klasifikasi(session: Session, field: str) -> list[str]:
+    """Nilai klasifikasi yang benar-benar dipakai master indikator."""
+    atribut = getattr(Indikator, field)
+    stmt = (
+        select(atribut)
+        .where(atribut.is_not(None), func.trim(atribut) != "", atribut.not_like("-%"))
+        .distinct()
+        .order_by(atribut)
+    )
+    return list(session.scalars(stmt))
+
+
 def buat(
     session: Session,
     indikator_fields: dict[str, object],
