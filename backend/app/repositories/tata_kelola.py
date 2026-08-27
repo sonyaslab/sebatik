@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, aliased
 
 from ..models import (
@@ -221,3 +221,28 @@ def catat_unggahan(session: Session, **kolom: Any) -> UnggahanExcel:
 def ambil_pengusul(session: Session, pengguna_id: int | None) -> Pengguna | None:
     """Akun pengusul sebuah usulan, untuk menampilkan nama pembaru data."""
     return session.get(Pengguna, pengguna_id) if pengguna_id else None
+
+
+def punya_usulan(session: Session, id_indikator: str) -> bool:
+    """Apakah indikator masih diacu baris `usulan_nilai`.
+
+    `usulan_nilai.id_indikator` adalah FK NOT NULL tanpa ON DELETE, jadi
+    menghapus indikator yang masih punya usulan akan menggagalkan transaksi
+    di tingkat basis data. Dipakai service untuk menolaknya lebih dulu
+    dengan pesan yang jelas.
+    """
+    stmt = select(UsulanNilai.id).where(UsulanNilai.id_indikator == id_indikator).limit(1)
+    return session.scalars(stmt).first() is not None
+
+
+def lepaskan_log_perubahan(session: Session, id_indikator: str) -> None:
+    """Putuskan kaitan jejak perubahan dari indikator yang akan dihapus.
+
+    `log_perubahan` bersifat append-only, jadi barisnya tidak ikut dihapus:
+    kolom FK-nya (nullable) dikosongkan supaya riwayat field tetap ada
+    sementara indikatornya boleh hilang. Jejak bahwa indikator itu pernah
+    ada dan dihapus tersimpan di `log_aktivitas` (aksi indikator_dihapus,
+    lengkap dengan objek_id dan snapshot detailnya).
+    """
+    session.execute(update(LogPerubahan).where(LogPerubahan.id_indikator == id_indikator).values(id_indikator=None))
+    session.flush()

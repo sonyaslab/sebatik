@@ -292,8 +292,16 @@ def periksa_konsistensi_id(id_indikator: str, kategori: str, nomor: int) -> Peno
 
 
 def periksa_penghapusan(session: Session, id_indikator: str) -> Penolakan | None:
+    """Indikator hanya boleh dihapus bila tidak ada lagi yang mengacunya.
+
+    Dua tabel memakai FK tanpa ON DELETE ke `indikator`, jadi keduanya harus
+    diperiksa di sini: tanpa ini basis data yang menolak, dan admin melihat
+    500 alih-alih pesan yang bisa ditindaklanjuti.
+    """
     if repo_indikator.punya_nilai(session, id_indikator):
         return Penolakan(409, "Indikator masih punya histori nilai; tidak dapat dihapus")
+    if repo_tata_kelola.punya_usulan(session, id_indikator):
+        return Penolakan(409, "Indikator masih punya usulan nilai; tidak dapat dihapus")
     return None
 
 
@@ -347,6 +355,10 @@ def hapus_indikator(session: Session, indikator: Indikator, *, pengguna_id: int 
         objek_id=id_indikator,
         detail={"nama_indikator": indikator.nama_indikator, "kategori": indikator.kategori},
     )
+    # `log_perubahan` append-only dan FK-nya tanpa ON DELETE: barisnya
+    # dilepaskan (id_indikator dikosongkan), bukan dihapus, supaya riwayat
+    # suntingan tetap ada setelah indikatornya hilang.
+    repo_tata_kelola.lepaskan_log_perubahan(session, id_indikator)
     repo_indikator.hapus(session, indikator)
     session.commit()
     return {"status": "DIHAPUS"}

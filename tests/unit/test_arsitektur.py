@@ -30,6 +30,16 @@ def _impor(path: Path) -> set[str]:
     return hasil
 
 
+def _pendaftaran_rute(fungsi: ast.expr) -> bool:
+    """`@router.delete(...)` mendaftarkan rute HTTP, bukan menyusun query.
+
+    Tanpa pengecualian ini, satu-satunya cara menambah endpoint DELETE adalah
+    menghindari dekorator bakunya — aturan yang dijaga di sini soal SQL di
+    router, bukan soal kata kerja HTTP mana yang boleh dipakai.
+    """
+    return isinstance(fungsi, ast.Attribute) and isinstance(fungsi.value, ast.Name) and fungsi.value.id == "router"
+
+
 def _panggilan(path: Path) -> set[str]:
     pohon = ast.parse(path.read_text(encoding="utf-8"))
     hasil: set[str] = set()
@@ -38,7 +48,7 @@ def _panggilan(path: Path) -> set[str]:
             fungsi = simpul.func
             if isinstance(fungsi, ast.Name):
                 hasil.add(fungsi.id)
-            elif isinstance(fungsi, ast.Attribute):
+            elif isinstance(fungsi, ast.Attribute) and not _pendaftaran_rute(fungsi):
                 hasil.add(fungsi.attr)
     return hasil
 

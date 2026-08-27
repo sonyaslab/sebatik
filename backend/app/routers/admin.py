@@ -2,20 +2,29 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Form, HTTPException
+from fastapi import APIRouter, Depends, Form, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..deps import get_session, id_terautentikasi, wajib_peran
 from ..models import Peran
+from ..repositories import indikator as repo_indikator
 from ..repositories import pengguna as repo_pengguna
 from ..repositories import tata_kelola as repo_tata_kelola
 from ..repositories.pengguna import ProfilPengguna
 from ..schemas.admin import DaftarAkunResponse, LogResponse, PenggunaDibuatResponse
+from ..schemas.indikator import (
+    DaftarIndikatorAdminResponse,
+    IndikatorAdminDetailResponse,
+    IndikatorDibuatResponse,
+    IndikatorFormBuat,
+    IndikatorFormDasar,
+)
 from ..schemas.umum import StatusResponse
 from ..services import auth as svc_auth
+from ..services import indikator as svc_indikator
 from ..services import pengguna as svc
 
 router = APIRouter(prefix="/api/v1", tags=["admin"])
@@ -115,3 +124,98 @@ def log_audit(
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
     return {"data": repo_tata_kelola.daftar_log_perubahan(session)}
+
+
+# --- CRUD indikator ---------------------------------------------------------
+#
+# Form dikirim sebagai multipart/form-data seperti endpoint mutasi lain di
+# berkas ini, tetapi field-nya ~30 buah — jadi dipakai satu parameter
+# Annotated[Model, Form()] alih-alih 30 parameter Form() skalar. Bentuk di
+# kabel tidak berubah, hanya tanda tangan fungsinya yang dikelompokkan.
+
+
+@router.get("/admin/indikator", response_model=DaftarIndikatorAdminResponse)
+def daftar_indikator_admin(
+    q: str | None = None,
+    kategori: list[str] | None = Query(None),
+    kelompok: list[str] | None = Query(None),
+    tim: list[str] | None = Query(None),
+    sort: str = "id_indikator",
+    order: Literal["asc", "desc"] = "asc",
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=200),
+    admin: ProfilPengguna = Depends(hanya_admin),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    return svc_indikator.daftar_admin(
+        session,
+        q=q,
+        kategori=kategori,
+        kelompok=kelompok,
+        tim=tim,
+        sort=sort,
+        order=order,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("/admin/indikator/{id_indikator}", response_model=IndikatorAdminDetailResponse)
+def detail_indikator_admin(
+    id_indikator: str,
+    admin: ProfilPengguna = Depends(hanya_admin),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    indikator = repo_indikator.ambil(session, id_indikator)
+    if indikator is None:
+        raise HTTPException(404, "Indikator tidak ditemukan")
+    return svc_indikator.detail_admin(session, indikator)
+
+
+@router.post("/admin/indikator", response_model=IndikatorDibuatResponse)
+def buat_indikator_admin(
+    form: Annotated[IndikatorFormBuat, Form()],
+    admin: ProfilPengguna = Depends(hanya_admin),
+    session: Session = Depends(get_session),
+) -> dict[str, str]:
+    penolakan = svc_indikator.periksa_konsistensi_id(form.id_indikator, form.kategori, form.nomor)
+    if penolakan:
+        raise HTTPException(penolakan.kode, penolakan.pesan)
+    try:
+        indikator = svc_indikator.buat_indikator(session, form, pengguna_id=id_terautentikasi(admin))
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(409, "id_indikator sudah dipakai") from exc
+    return {"status": "DIBUAT", "id_indikator": indikator.id_indikator}
+
+
+@router.put("/admin/indikator/{id_indikator}", response_model=StatusResponse)
+def perbarui_indikator_admin(
+    id_indikator: str,
+    form: Annotated[IndikatorFormDasar, Form()],
+    admin: ProfilPengguna = Depends(hanya_admin),
+    session: Session = Depends(get_session),
+) -> dict[str, str]:
+    indikator = repo_indikator.ambil(session, id_indikator)
+    if indikator is None:
+        raise HTTPException(404, "Indikator tidak ditemukan")
+    penolakan = svc_indikator.periksa_konsistensi_id(id_indikator, form.kategori, form.nomor)
+    if penolakan:
+        raise HTTPException(penolakan.kode, penolakan.pesan)
+    metadata = repo_indikator.ambil_metadata(session, id_indikator)
+    return svc_indikator.perbarui_indikator(session, indikator, metadata, form, pengguna_id=id_terautentikasi(admin))
+
+
+@router.delete("/admin/indikator/{id_indikator}", response_model=StatusResponse)
+def hapus_indikator_admin(
+    id_indikator: str,
+    admin: ProfilPengguna = Depends(hanya_admin),
+    session: Session = Depends(get_session),
+) -> dict[str, str]:
+    indikator = repo_indikator.ambil(session, id_indikator)
+    if indikator is None:
+        raise HTTPException(404, "Indikator tidak ditemukan")
+    penolakan = svc_indikator.periksa_penghapusan(session, id_indikator)
+    if penolakan:
+        raise HTTPException(penolakan.kode, penolakan.pesan)
+    return svc_indikator.hapus_indikator(session, indikator, pengguna_id=id_terautentikasi(admin))
