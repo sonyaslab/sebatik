@@ -87,5 +87,9 @@ try {
 # Akun awal dibuat eksplisit. Sandinya acak dan hanya ditampilkan sekali di sini.
 & $Python -m backend.app.cli seed --tampilkan-sandi
 
+# Master indikator dibundel sebagai fixture kanonis dan dimuat idempoten.
+# Perintah ini aman dijalankan ulang karena melewati seed bila data sudah ada.
+& $Python -m backend.app.cli seed-indikator
+
 Write-Host ''
 Write-Host 'Pemasangan selesai. Catat sandi di atas, lalu jalankan .\jalankan-sebatik.ps1' -ForegroundColor Green

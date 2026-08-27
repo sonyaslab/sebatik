@@ -25,7 +25,10 @@ EXPOSE 8000
 # deployment satu container lain. Seed akun tetap one-shot manual:
 #   python -m backend.app.cli seed --tampilkan-sandi
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Checkout Git di Windows dapat mengubah LF menjadi CRLF. Hapus carriage
+# return di dalam image agar shebang tetap dikenali Linux.
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
