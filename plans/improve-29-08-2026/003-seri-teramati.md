@@ -4,12 +4,13 @@ Baca `plans/improve-29-08-2026/README.md` dan `AGENTS.md` sebelum mulai.
 
 **Tujuan:** Capaian, insight (seri YoY), dan analitik memakai tahun yang benar-benar ada. Beranda **tetap** mengisi celah 2021–2025 (kartu sudah menampilkan `keterangan`).
 
-**Ditulis terhadap:** commit `8b3ae9a`.
+**Ditulis terhadap (awal):** `8b3ae9a`.
+**Disesuaikan terhadap:** `4a7939f` (29 Agustus 2026). Berkas seri/analitik **tidak** berubah di batch seed/CRUD/unggah; bug isian celah masih ada.
 
 **Cek dulu:**
 
 ```text
-git diff --stat 8b3ae9a..HEAD -- backend/app/repositories/nilai.py backend/app/services/analitik.py backend/app/services/capaian.py backend/app/services/insight.py backend/app/services/beranda.py tests/integrasi/test_repositories.py tests/unit/test_services_analitik.py
+git diff --stat 4a7939f..HEAD -- backend/app/repositories/nilai.py backend/app/services/analitik.py backend/app/services/capaian.py backend/app/services/insight.py backend/app/services/beranda.py tests/integrasi/test_repositories.py tests/unit/test_services_analitik.py
 ```
 
 ## Ringkasan
@@ -33,8 +34,8 @@ Kartu beranda harus **tetap** memakai isian celah (mereka menampilkan `keteranga
 
 ## Keadaan sekarang
 
-- `backend/app/repositories/nilai.py` sekitar 123–167 — `seri()`: muat semua periode, ambil periode terakhir per `(tahun, jenis)`, lalu isi 2021–2025.
-- `backend/app/services/analitik.py` sekitar 115–121:
+- `backend/app/repositories/nilai.py` 123–167 — `seri()`: muat semua periode, ambil periode terakhir per `(tahun, jenis)`, lalu isi 2021–2025.
+- `backend/app/services/analitik.py` 115–121:
 
 ```python
 def seri_realisasi(session: Session, id_indikator: str) -> list[tuple[int, float]]:
@@ -45,9 +46,10 @@ def seri_realisasi(session: Session, id_indikator: str) -> list[tuple[int, float
     ]
 ```
 
-- `backend/app/services/capaian.py` sekitar 235–270 dan 294–301 — `muatan()` dan `detail()` memakai `repo_nilai.seri(...)`.
-- `backend/app/services/insight.py` sekitar 70–86 — `_seri` mengiterasi `repo_nilai.seri(..., REALISASI)` untuk `growth`.
-- `backend/app/services/beranda.py` sekitar 39–44 dan 76 — `_kartu_makro` / `_kartu_visi` memakai `seri()` **sengaja** (jangan diganti).
+- `backend/app/services/capaian.py` 235 dan 297 — `muatan()` dan `detail()` memakai `repo_nilai.seri(...)`.
+- `backend/app/services/insight.py` 70–86 — `_seri` mengiterasi `repo_nilai.seri(..., REALISASI)` untuk `growth`.
+- `backend/app/services/beranda.py` 41 dan 76 — `_kartu_makro` / `_kartu_visi` memakai `seri()` **sengaja** (jangan diganti).
+- Pemanggil `seri()` lain yang **sengaja di luar cakupan** plan ini: `ekspor.py` sekitar 230, `explorer.py` sekitar 75, `services/indikator.py` `detail()` sekitar 85. Jangan dialihkan di PR ini.
 - Benih kontrak (`tests/api/conftest.py`) sudah punya realisasi 2021–2025 untuk ISV-001/002/005/IUP-001, jadi `test_analitik` kemungkinan `n >= 4` tetap. Tetap perlu tes **jarang** (satu tahun) agar perbaikan terkunci.
 
 Komentar baru menjelaskan *mengapa* ada dua fungsi. Jangan taruh SQL di service.
@@ -66,7 +68,8 @@ Komentar baru menjelaskan *mengapa* ada dua fungsi. Jangan taruh SQL di service.
 - Batch query N+1.
 - Kartu/peta insight yang memakai `ambil` / `terakhir_terisi` (itu plan 005).
 - Komponen grafik frontend.
-- Pemanggil `seri()` di `beranda.py`.
+- Pemanggil `seri()` di `beranda.py`, `ekspor.py`, `explorer.py`, `services/indikator.py`.
+- Seed / CRUD admin / unggah Excel (sudah di `main`).
 
 ## Langkah
 

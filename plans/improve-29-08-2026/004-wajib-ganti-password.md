@@ -4,12 +4,13 @@ Baca `plans/improve-29-08-2026/README.md` dan `AGENTS.md` sebelum mulai.
 
 **Tujuan:** Akun dengan `harus_ganti_password=True` tidak bisa memakai rute istimewa sampai sandinya diganti. Penggantian sandi sendiri wajib mengirim sandi saat ini. Sandi lebih dari 128 karakter ditolak sebelum Argon2.
 
-**Ditulis terhadap:** commit `8b3ae9a`.
+**Ditulis terhadap (awal):** `8b3ae9a`.
+**Disesuaikan terhadap:** `4a7939f` (29 Agustus 2026). Bendera masih kosmetik. `AdminPage.jsx` sekarang juga memuat `UnggahExcelPanel` dan `IndikatorManager` — layar ganti sandi harus **keluar sebelum** ruang kerja itu dirender.
 
 **Cek dulu:**
 
 ```text
-git diff --stat 8b3ae9a..HEAD -- backend/app/deps.py backend/app/routers/auth.py backend/app/services/auth.py backend/app/security.py backend/app/routers/admin.py frontend/src/pages/AdminPage.jsx frontend/src/api/endpoints.js tests/api/test_keamanan_http.py tests/unit/test_keamanan.py
+git diff --stat 4a7939f..HEAD -- backend/app/deps.py backend/app/routers/auth.py backend/app/services/auth.py backend/app/security.py backend/app/routers/admin.py frontend/src/pages/AdminPage.jsx frontend/src/api/endpoints.js tests/api/test_keamanan_http.py tests/unit/test_keamanan.py
 ```
 
 ## Ringkasan
@@ -46,11 +47,13 @@ def wajib_peran(*peran: str):
     return dependency
 ```
 
-- `backend/app/routers/auth.py` sekitar 79–90 — `ganti_password(password_baru: str = Form(...), ...)` tanpa `password_lama`.
-- `backend/app/services/auth.py` sekitar 119–123 — hash, commit, `wajib_ganti=False`.
-- `backend/app/security.py` sekitar 40–56 — `PANJANG_PASSWORD_MINIMUM = 12`; `password_memenuhi_syarat` hanya cek minimum.
-- `frontend/src/pages/AdminPage.jsx` sekitar 37–54 — `refresh()` selalu memanggil `daftarUsulan()` setelah `profilSaya()`. Jika usulan mulai 403, `catch` **menghapus token** (“Sesi berakhir”). UI **wajib** tidak memuat antrean selama bendera menyala, atau login pertama terlihat seperti logout.
-- `frontend/src/api/endpoints.js` sekitar 37–38 — `gantiPassword` sudah POST FormData ke `/auth/ganti-password`.
+- `backend/app/routers/auth.py` 79–90 — `ganti_password(password_baru: str = Form(...), ...)` tanpa `password_lama`.
+- `backend/app/services/auth.py` 119–123 — hash, commit, `wajib_ganti=False`.
+- `backend/app/security.py` 40–56 — `PANJANG_PASSWORD_MINIMUM = 12`; `password_memenuhi_syarat` hanya cek minimum.
+- `frontend/src/pages/AdminPage.jsx` 39–56 — `refresh()` memanggil `profilSaya()`, lalu **langsung** `wilayah()`, `capaianExplorer()`, dan `daftarUsulan()`. `catch` **menghapus token** (“Sesi berakhir”). Jika `daftarUsulan` mulai 403, login pertama terlihat seperti logout.
+- `IndikatorManager` (baris 379) memuat `/admin/indikator` sendiri di `useEffect`. `UnggahExcelPanel` (baris 279) juga. Jangan merender keduanya selama bendera menyala — early-return layar ganti sandi sudah cukup, asal dipasang **sebelum** `return <Shell>`.
+- `PasswordResetModal` = admin mereset sandi **orang lain**. Bukan layar ganti sandi login pertama; jangan dipakai ulang untuk ini.
+- `frontend/src/api/endpoints.js` 37–38 — `gantiPassword` sudah POST FormData ke `/auth/ganti-password`.
 - Akun benih API `harus_ganti_password=False` (`tests/api/conftest.py` sekitar 169) — tes login kontrak tetap 200.
 - Fixture `auth` = admin. Pengguna berbendera di tes dibuat lewat `POST /api/v1/admin/pengguna`.
 
@@ -71,7 +74,8 @@ Service mengembalikan `Ditolak` / `Penolakan`; jangan impor FastAPI di `services
 - Penyimpanan `jti` token segar / cabut saat logout.
 - Header CSP / menyembunyikan `/api/docs`.
 - Pencetakan sandi CLI seed.
-- `routers/admin.py` kecuali ternyata menyalin cek panjang sendiri (sekarang lewat `password_layak` / `periksa_pembuatan`).
+- `routers/admin.py` kecuali ternyata menyalin cek panjang sendiri (sekarang lewat `password_layak` / `periksa_pembuatan`). CRUD indikator dan unggah Excel sudah di `main` — jangan diubah.
+- `IndikatorManager.jsx`, `UnggahExcelPanel.jsx`, `PasswordResetModal.jsx`.
 
 ## Langkah
 
@@ -123,14 +127,14 @@ python -m pytest tests/api/test_keamanan_http.py tests/api/test_kontrak.py tests
 
 ### 4. Gerbang frontend
 
-Di `refresh()` pada `AdminPage.jsx`:
+Di `refresh()` pada `AdminPage.jsx` (bentuk sekarang sekitar 39–56):
 1. `profilSaya()`
 2. `setMe(profile)`
-3. jika `profile.harus_ganti_password`, **return** (jangan fetch usulan/pengguna/log).
+3. jika `profile.harus_ganti_password`, **return** — jangan panggil `wilayah()`, `capaianExplorer()`, `daftarUsulan()`, `daftarPengguna()`, `logAudit()`.
 
-Setelah cabang `if(!me)` (sedang memeriksa sesi), **sebelum** ruang kerja: jika `me.harus_ganti_password`, tampilkan `LoginShell` berisi formulir `password_lama` + `password_baru`, kirim lewat `endpoints.gantiPassword(new FormData(...))`, lalu `refresh()`.
+Setelah cabang `if(!me)` (sedang memeriksa sesi, sekitar 160–165), **sebelum** `return <Shell>` (sekitar 212): jika `me.harus_ganti_password`, tampilkan `LoginShell` berisi formulir `password_lama` + `password_baru`, kirim lewat `endpoints.gantiPassword(new FormData(...))`, lalu `refresh()`.
 
-Jangan menambah hook setelah early return yang sudah ada.
+Early return itu juga mencegah `UnggahExcelPanel` / `IndikatorManager` terpasang (keduanya di dalam `Shell`). Jangan menambah hook setelah early return yang sudah ada.
 
 **Cek:**
 

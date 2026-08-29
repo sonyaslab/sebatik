@@ -4,12 +4,13 @@ Baca `plans/improve-29-08-2026/README.md` dan `AGENTS.md` sebelum mulai.
 
 **Tujuan:** Operator yang mengirim realisasi **tahunan** (pilihan bawaan formulir) mendapat HTTP 200 dan baris usulan dengan `periode` NULL, bukan 422.
 
-**Ditulis terhadap:** commit `8b3ae9a` (29 Agustus 2026).
+**Ditulis terhadap (awal):** `8b3ae9a`.
+**Disesuaikan terhadap:** `4a7939f` (29 Agustus 2026). Formulir usulan masih di `AdminPage.jsx`; panel `IndikatorManager` / `UnggahExcelPanel` yang baru **jangan disentuh**.
 
-**Cek dulu** (jika ada diff, berhenti dan tanya):
+**Cek dulu:** diff di `AdminPage.jsx` yang hanya impor/pasang `IndikatorManager` / `UnggahExcelPanel` **bukan** alasan berhenti. Berhenti hanya jika `submitValue`, `<select name="periode">`, atau `periode: int | None = Form(None)` sudah berubah.
 
 ```text
-git diff --stat 8b3ae9a..HEAD -- backend/app/routers/usulan.py backend/app/services/verifikasi.py frontend/src/pages/AdminPage.jsx tests/api/test_kontrak.py tests/api/conftest.py
+git diff --stat 4a7939f..HEAD -- backend/app/routers/usulan.py backend/app/services/verifikasi.py frontend/src/pages/AdminPage.jsx tests/api/test_kontrak.py tests/api/conftest.py
 ```
 
 ## Ringkasan
@@ -27,11 +28,11 @@ git diff --stat 8b3ae9a..HEAD -- backend/app/routers/usulan.py backend/app/servi
 
 Pilihan bawaan formulir operator adalah “Tahunan / tidak berkala” dengan `<option value="">`. `FormData` selalu mengirim `periode=` (string kosong). FastAPI `periode: int | None = Form(None)` menolak `""` sebelum handler jalan, jadi jalur yang didokumentasikan — realisasi tahunan + bukti — tidak pernah membuat usulan.
 
-Belum ada tes HTTP untuk `POST /api/v1/admin/usulan`. `tests/integrasi/test_alur_verifikasi.py` menyisip lewat repository, jadi tidak melihat cacat ini.
+`POST /api/v1/admin/usulan` sudah ada di `tests/api/test_admin_indikator.py` sekitar 147–159, tetapi **mengosongkan field `periode`** (tidak dikirim sama sekali) — itu 200 karena FastAPI mengikat `None`. Bug-nya adalah `periode=""` dari `<select>`, yang belum diuji. `tests/integrasi/test_alur_verifikasi.py` menyisip lewat repository, jadi juga tidak melihat cacat Form.
 
 ## Keadaan sekarang
 
-- `frontend/src/pages/AdminPage.jsx` sekitar baris 298–301:
+- `frontend/src/pages/AdminPage.jsx` sekitar 302–306 (masih di form operator, bukan di `IndikatorManager`):
 
 ```jsx
 <select name="periode" value={draft.periode} onChange={e=>setDraft({...draft,periode:e.target.value})}>
@@ -41,13 +42,16 @@ Belum ada tes HTTP untuk `POST /api/v1/admin/usulan`. `tests/integrasi/test_alur
 </select>
 ```
 
-- `AdminPage.jsx` sekitar 166–174 — kirim `FormData` utuh (termasuk `periode` kosong):
+- `AdminPage.jsx` sekitar 168–176 — kirim `FormData` utuh (termasuk `periode` kosong):
 
 ```js
-const result=await endpoints.kirimUsulan(new FormData(event.currentTarget))
+const submitValue=async event=>{
+  event.preventDefault()
+  try{
+    const result=await endpoints.kirimUsulan(new FormData(event.currentTarget))
 ```
 
-- `backend/app/routers/usulan.py` sekitar 29–62 — `periode: int | None = Form(None)`. Pesan galat “Periode semester harus 1 atau 2”, padahal di service `PERIODE_SAH = (None, 1, 2, 3, 4)`.
+- `backend/app/routers/usulan.py` baris 35 dan 61–62 — `periode: int | None = Form(None)`. Pesan galat “Periode semester harus 1 atau 2”, padahal di service `PERIODE_SAH = (None, 1, 2, 3, 4)`.
 - `backend/app/services/verifikasi.py` sekitar 145–149:
 
 ```python
@@ -61,6 +65,8 @@ def periode_sah(periode: int | None) -> bool:
 - MIME bukti (`backend/app/services/bukti.py`): `application/pdf`, jpeg, png, xlsx. Tes boleh mengirim isi kecil dengan `content_type="application/pdf"` — tipe diambil dari header, bukan isi berkas.
 
 **Pola yang harus ditiru:** router memvalidasi masukan dan mengubah `Penolakan` jadi `HTTPException`. Penguraian string formulir diletakkan di `services/verifikasi.py` agar router tetap tipis. Impor `Penolakan` dari `backend.app.services` (`services/__init__.py`). Tes HTTP meniru `tests/api/test_keamanan_http.py`.
+
+Jangan menempel `OpsionalInt` / `_kosong_jadi_none` dari `backend/app/schemas/indikator.py` ke parameter Form usulan — itu pola CRUD admin (satu model Form). Usulan tetap parameter skalar + `baca_periode` di service.
 
 ## Cakupan
 
@@ -76,7 +82,9 @@ def periode_sah(periode: int | None) -> bool:
 - Validasi MIME/ukuran unggahan.
 - `harus_ganti_password` (itu plan 004).
 - Isi `PERIODE_SAH` (jangan buang 3/4).
-- Seed indikator / CRUD admin indikator.
+- Seed indikator / CRUD admin / unggah Excel — **sudah di `main`**. Jangan diimplementasikan ulang.
+- `frontend/src/components/admin/IndikatorManager.jsx`, `UnggahExcelPanel.jsx`, `backend/app/routers/admin.py` (CRUD).
+- `refresh()` di `AdminPage.jsx` (plan 004).
 
 ## Langkah
 

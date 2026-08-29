@@ -4,17 +4,31 @@
 |---|---|
 | Folder | `plans/improve-29-08-2026/` |
 | Tanggal pembuatan | 29 Agustus 2026 |
-| Commit acuan | `8b3ae9a` |
+| Commit acuan awal | `8b3ae9a` |
+| Disesuaikan terhadap | `4a7939f` (29 Agustus 2026) |
 | Asal | satu pemanggilan audit `/improve` |
 
 Dokumen ini untuk **developer** (manusia atau asisten kode di harness mana pun: Grok, Claude Code, OpenCode, Cursor, dll.). Tidak perlu skill, plugin, atau alur kerja khusus. Baca `AGENTS.md` di akar repositori, lalu kerjakan satu berkas plan di **folder ini**.
 
-**Bukan bagian dari pekerjaan ini:** seed 86 indikator dan CRUD admin indikator. Itu sudah ada di `docs/superpowers/plans/2026-08-27-seed-indikator.md` dan `docs/superpowers/plans/2026-08-27-admin-manajemen-indikator.md` — jangan dicampur ke PR ini.
+**Bukan bagian dari pekerjaan ini:** seed 86 indikator, CRUD admin indikator, dan unggah Excel admin. Ketiganya **sudah di `main`** (CLI `seed-indikator`, `GET/POST /api/v1/admin/indikator`, `IndikatorManager` / `UnggahExcelPanel`). Jangan diimplementasikan ulang. Plan lama di `docs/superpowers/plans/2026-08-27-*.md` adalah catatan sejarah.
+
+## Rekonsiliasi 29 Agustus 2026
+
+`origin/main` maju dari `8b3ae9a` ke `4a7939f` sebelum batch ini dieksekusi. Yang berubah dan dampaknya ke plan:
+
+| Perubahan di `main` | Dampak |
+|---|---|
+| Seed CLI + `indikator_seed.json` | Katalog produksi bisa terisi. Bukan pekerjaan 001–005. |
+| CRUD admin indikator | `daftar_admin` memakai `repo_indikator.cari()` yang sama dengan katalog publik. Plan 005 wajib parameter `hanya_terverifikasi`, bukan saring buta. |
+| Unggah Excel `.xlsx` + validasi 86 ID `ISV-001` | Temuan 002 (skip `ISV-01` lalu `DISETUJUI`) **hilang**. Plan 002 `DITOLAK`. |
+| `AdminPage` memasang `UnggahExcelPanel` + `IndikatorManager` | Plan 001 hanya form usulan. Plan 004 harus early-return sebelum `Shell` agar panel baru tidak terpasang saat bendera ganti sandi. |
+
+Bug 001, 003, 004, 005 **masih ada** di `4a7939f`.
 
 ## Cara memakai
 
 1. Baca `AGENTS.md` (arsitektur, konvensi, perintah tes).
-2. Pilih **satu** baris TODO di tabel bawah. Kerjakan sampai selesai sebelum mengambil plan lain, kecuali 004 yang boleh paralel dengan 001/002.
+2. Pilih **satu** baris TODO di tabel bawah. Kerjakan sampai selesai sebelum mengambil plan lain, kecuali 004 yang boleh paralel dengan 001.
 3. Buat cabang dari `main` dengan nama yang disarankan di dalam berkas plan.
 4. Ikuti langkah berurutan. Setiap langkah punya perintah cek dan hasil yang diharapkan.
 5. Tulis tes yang **gagal** dulu, baru ubah kode produksi.
@@ -22,23 +36,24 @@ Dokumen ini untuk **developer** (manusia atau asisten kode di harness mana pun: 
 7. Jangan push atau buka PR kecuali diminta.
 8. Setelah selesai, ubah kolom Status di tabel ini menjadi `DONE`.
 
-Kalau kode di lokasi yang dikutip plan sudah berbeda dari cuplikan (file berubah sejak `8b3ae9a`), **berhenti dan tanya** — jangan menerka.
+Kalau kode di lokasi yang dikutip plan sudah berbeda dari cuplikan (file berubah sejak `4a7939f`), **berhenti dan tanya** — jangan menerka.
 
 ## Urutan dan status
 
 | Plan | Judul | Perkiraan | Bergantung | Status |
 |------|-------|-----------|------------|--------|
 | [001](001-usulan-periode-kosong.md) | Usulan tahunan dengan periode formulir kosong | beberapa jam | — | TODO |
-| [002](002-unggahan-id-master.md) | Tolak unggahan massal tanpa irisan ID master | sekitar sehari | — | TODO |
+| [002](002-unggahan-id-master.md) | Tolak unggahan massal tanpa irisan ID master | — | — | DITOLAK (diperbaiki independen) |
 | [003](003-seri-teramati.md) | Pisahkan seri tampilan beranda dari seri teramati | sekitar sehari | — | TODO |
 | [004](004-wajib-ganti-password.md) | Tegakkan ganti sandi awal + sandi lama | beberapa jam | — | TODO |
 | [005](005-katalog-publik-dan-periode.md) | Katalog publik hanya DISETUJUI; insight/peta memakai periode | beberapa jam | 003 | TODO |
 
-Status: `TODO` | `SEDANG DIKERJAKAN` | `DONE` | `TERBENGKALAI (alasan satu baris)`
+Status: `TODO` | `SEDANG DIKERJAKAN` | `DONE` | `TERBENGKALAI (alasan satu baris)` | `DITOLAK (alasan satu baris)`
 
-- 004 tidak bergantung pada yang lain; boleh dikerjakan bersamaan dengan 001 atau 002.
+- 002 **jangan dikerjakan**. Jalur unggah sekarang memvalidasi ID tiga digit.
+- 004 tidak bergantung pada yang lain; boleh dikerjakan bersamaan dengan 001.
 - 005 menyentuh `insight.py` / `capaian.py` yang sama dengan 003 — kerjakan setelah 003 selesai.
-- Jangan campur 001/002 dengan pekerjaan seed-indikator.
+- Jangan campur 001 dengan pekerjaan seed/CRUD/unggah Excel.
 
 ## Konvensi yang wajib diikuti
 
@@ -62,7 +77,7 @@ ruff check . ; ruff format --check . ; mypy backend src
 cd frontend && pnpm lint && pnpm test && pnpm build
 ```
 
-Tes kontrak API memakai benih di `tests/api/conftest.py`, tidak butuh folder `data/`.
+Tes kontrak API memakai benih di `tests/api/conftest.py` (5 indikator, termasuk `IUP-002` draf), tidak butuh folder `data/`. Seed produksi 86 baris tidak dipakai tes API.
 
 ## Yang sengaja tidak dikerjakan di sini
 
@@ -72,4 +87,5 @@ Tes kontrak API memakai benih di `tests/api/conftest.py`, tidak butuh folder `da
 - Pembatas laju login di memori proses — cukup untuk satu instans, tercatat di kode.
 - Query N+1 di beranda (~86 indikator) — N kecil; ditinjau lagi jika seri kabupaten/kota masuk.
 - SSO dan seri kabupaten/kota lengkap — keterbatasan produk (`docs/keterbatasan.md`).
-- Katalog indikator kosong di Coolify — sudah direncanakan di plan seed-indikator.
+- Katalog indikator kosong di Coolify — ditangani seed yang sudah di `main`.
+- Unggahan ID `ISV-01` vs master — ditangani validasi dataset Excel (plan 002 ditolak).
