@@ -72,6 +72,7 @@ Dokumentasi API: `http://localhost:8000/api/docs`.
 | `tests/` | `unit/` (service murni, keamanan, aturan arsitektur), `api/` (kontrak), `integrasi/` (repository, migrasi, alur verifikasi), `etl/`. |
 | `data/raw/`, `data/processed/` | **Tidak ter-commit.** Salin dari berbagi pakai kantor. |
 | `docs/` | Dokumentasi 01–10, kamus data, dan `docs/refactoring/`. |
+| `plans/` | Rencana perbaikan dari audit `/improve`, satu folder per pemanggilan: `plans/improve-DD-MM-YYYY/`. Indeks di `plans/README.md`. Boleh dikerjakan developer atau asisten kode apa pun — tidak butuh skill improve. |
 
 ## Aturan arsitektur
 
