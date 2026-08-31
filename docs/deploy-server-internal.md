@@ -1,5 +1,8 @@
 # Deployment Server Internal
 
+Untuk pemasangan berdomain lewat Coolify dan Cloudflare, lihat
+[deploy-coolify-cloudflare.md](deploy-coolify-cloudflare.md).
+
 1. Salin proyek ke server yang memiliki Docker Engine dan Docker Compose.
 2. Salin `.env.production.example` menjadi `.env`.
 3. Ganti `SEBATIK_SECRET_KEY` dengan string acak kuat.
@@ -10,4 +13,4 @@
 
 Menghentikan: `docker compose down`. Data tidak hilang karena berada di volume. Mengikuti log: `docker compose logs -f sebatik`.
 
-Service `backup` membuat salinan SQLite setiap 24 jam dan menyimpan 30 backup terbaru pada volume `sebatik_backup`. Uji pemulihan secara berkala; backup yang tidak pernah diuji belum dapat dianggap aman.
+Service `backup` membuat salinan `pg_dump` setiap 24 jam dan menyimpan 30 backup terbaru pada volume `sebatik_backup`. Uji pemulihan secara berkala; backup yang tidak pernah diuji belum dapat dianggap aman.

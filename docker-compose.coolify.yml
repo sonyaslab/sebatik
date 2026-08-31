@@ -1,0 +1,52 @@
+# Varian untuk Coolify dengan PostgreSQL eksternal (termasuk PostgreSQL
+# add-on Coolify sendiri): tidak ada service `db` dan `backup`.
+#
+# Variabel disuntikkan lewat substitusi ${VAR} — cara Coolify meneruskan
+# Environment Variables UI ke compose. Jangan pakai env_file: Coolify tidak
+# selalu menuliskannya sebagai berkas .env yang dibaca env_file, sehingga
+# container diam-diam jatuh ke SQLite bawaan.
+#
+# Isi daftar variabelnya di UI Coolify (lihat .env.coolify.example), lalu
+# Deploy ulang seluruh stack.
+
+services:
+  migrasi:
+    build: .
+    environment:
+      - SEBATIK_ENVIRONMENT=${SEBATIK_ENVIRONMENT}
+      - SEBATIK_DATABASE_URL=${SEBATIK_DATABASE_URL}
+      - SEBATIK_SECRET_KEY=${SEBATIK_SECRET_KEY}
+      - SEBATIK_CORS_ORIGINS=${SEBATIK_CORS_ORIGINS}
+      - SEBATIK_SECRET_KEYS=${SEBATIK_SECRET_KEYS}
+    command: ["python", "-m", "alembic", "-c", "backend/alembic.ini", "upgrade", "head"]
+    # Basis data eksternal dianggap sudah berjalan sebelum compose dinyalakan.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  sebatik:
+    build: .
+    restart: unless-stopped
+    environment:
+      - SEBATIK_ENVIRONMENT=${SEBATIK_ENVIRONMENT}
+      - SEBATIK_DATABASE_URL=${SEBATIK_DATABASE_URL}
+      - SEBATIK_SECRET_KEY=${SEBATIK_SECRET_KEY}
+      - SEBATIK_CORS_ORIGINS=${SEBATIK_CORS_ORIGINS}
+      - SEBATIK_SECRET_KEYS=${SEBATIK_SECRET_KEYS}
+      - FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS}
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - sebatik_data:/app/data/processed
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      migrasi:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  sebatik_data:
