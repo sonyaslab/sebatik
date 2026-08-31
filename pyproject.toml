@@ -57,5 +57,9 @@ exclude = [
     "scripts/generate_system_diagrams.py",
     "scripts/seed_master_dashboard.py",
     "tools/*.py",
+    # Dokumentasi dan rencana perbaikan memuat cuplikan Python sebagai ilustrasi.
+    # Cuplikan itu memang dipotong seperlunya; memformatnya justru mengubah
+    # dokumen yang sudah selesai ditulis.
     "docs/**",
+    "plans/**",
 ]

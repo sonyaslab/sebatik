@@ -42,13 +42,47 @@ Kalau kode di lokasi yang dikutip plan sudah berbeda dari cuplikan (file berubah
 
 | Plan | Judul | Perkiraan | Bergantung | Status |
 |------|-------|-----------|------------|--------|
-| [001](001-usulan-periode-kosong.md) | Usulan tahunan dengan periode formulir kosong | beberapa jam | — | TODO |
+| [001](001-usulan-periode-kosong.md) | Usulan tahunan dengan periode formulir kosong | beberapa jam | — | DONE |
 | [002](002-unggahan-id-master.md) | Tolak unggahan massal tanpa irisan ID master | — | — | DITOLAK (diperbaiki independen) |
-| [003](003-seri-teramati.md) | Pisahkan seri tampilan beranda dari seri teramati | sekitar sehari | — | TODO |
-| [004](004-wajib-ganti-password.md) | Tegakkan ganti sandi awal + sandi lama | beberapa jam | — | TODO |
-| [005](005-katalog-publik-dan-periode.md) | Katalog publik hanya DISETUJUI; insight/peta memakai periode | beberapa jam | 003 | TODO |
+| [003](003-seri-teramati.md) | Pisahkan seri tampilan beranda dari seri teramati | sekitar sehari | — | DONE |
+| [004](004-wajib-ganti-password.md) | Tegakkan ganti sandi awal + sandi lama | beberapa jam | — | DONE |
+| [005](005-katalog-publik-dan-periode.md) | Katalog publik hanya DISETUJUI; insight/peta memakai periode | beberapa jam | 003 | DONE |
 
 Status: `TODO` | `SEDANG DIKERJAKAN` | `DONE` | `TERBENGKALAI (alasan satu baris)` | `DITOLAK (alasan satu baris)`
+
+### Catatan pelaksanaan 30 Agustus 2026
+
+Keempat plan TODO dikerjakan dalam satu rangkaian di atas `0dc059d`, bukan dari
+`main` — `main` masih tertinggal di belakang batch seed/CRUD/unggah Excel, jadi
+mencabang dari sana akan kehilangan kode yang justru dirujuk plan.
+
+- **001** — tes langkah 1 lulus tanpa ubahan produksi: FastAPI 0.141.1 yang
+  terpasang mengikat `periode=""` menjadi `None` sendiri. Pin `fastapi>=0.115,<1`
+  masih memuat versi yang menolaknya, jadi perbaikannya tetap diterapkan supaya
+  perilakunya tidak bergantung versi yang kebetulan terpasang.
+- **004** — `PESAN_PASSWORD_PENDEK` sebelumnya ditulis dua kali (`services/auth.py`
+  dan `services/pengguna.py`) dan hanya menyebut batas minimum. Kini satu sumber
+  `PESAN_PANJANG_PASSWORD` di `security.py`, di samping angka kebijakannya.
+- **003** — `n` korelasi pada benih kontrak tetap 5 setelah peralihan ke
+  `seri_teramati`, jadi tidak ada kondisi berhenti.
+- Di luar plan: `tests/integrasi/test_service_indikator_admin.py` masih memanggil
+  `periksa_konfirmasi_penghapusan` dengan dua argumen — sisa dari `505fc1a` yang
+  sengaja mengubahnya menjadi bendera boolean tetapi melewatkan berkas tes ini.
+  Disamakan supaya baseline hijau.
+
+### Verifikasi 31 Agustus 2026
+
+Seluruh rangkaian cek dijalankan ulang di atas hasil batch: `python -m pytest`
+(539 lulus, cakupan 87%), `ruff check`, `ruff format --check`, `mypy backend src`,
+serta `pnpm lint` / `pnpm test` / `pnpm build` di `frontend/`. Dua perbaikan di
+luar isi plan supaya perintah cek di berkas ini benar-benar hijau:
+
+- `backend/app/routers/admin.py` dan `tests/api/test_admin_indikator.py` punya
+  akhiran baris campur sejak `505fc1a` (beberapa baris LF di berkas CRLF), jadi
+  `ruff format --check` menolaknya. Dinormalkan; isinya tidak berubah.
+- `plans/**` masuk daftar kecuali `[tool.ruff.format]` di `pyproject.toml`,
+  sejajar dengan `docs/**`: berkas plan memuat cuplikan Python sebagai ilustrasi
+  yang memang dipotong seperlunya.
 
 - 002 **jangan dikerjakan**. Jalur unggah sekarang memvalidasi ID tiga digit.
 - 004 tidak bergantung pada yang lain; boleh dikerjakan bersamaan dengan 001.

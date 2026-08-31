@@ -198,6 +198,52 @@ def test_seri_tampilan_mengisi_tahun_kosong_dengan_nilai_terdekat(session, indik
     ]
 
 
+def test_nilai_tampil_memilih_semester(session, indikator_uji):
+    """Rilis semester menang atas nilai tahunan pada tahun yang sama."""
+    _sisip_nilai(session, tahun=2025, nilai=1.0)
+    _sisip_nilai(session, tahun=2025, nilai=3.0, periode=2, label_periode="Semester 2")
+
+    assert repo_nilai.nilai_tampil(session, "ISV-001", PROVINSI, 2025).nilai == 3.0
+
+
+def test_nilai_tampil_tanpa_nilai_tahunan(session, indikator_uji):
+    """Wilayah yang hanya punya rilis semester tetap punya angka tampil."""
+    _sisip_nilai(session, tahun=2025, nilai=3.0, periode=2, label_periode="Semester 2")
+
+    assert repo_nilai.nilai_tampil(session, "ISV-001", PROVINSI, 2025).nilai == 3.0
+    # Pembacaan tahunan tetap kosong; yang berubah hanya angka yang ditampilkan.
+    assert repo_nilai.ambil(session, "ISV-001", PROVINSI, 2025, JenisNilai.REALISASI) is None
+
+
+def test_terakhir_terisi_termasuk_periode_membaca_rilis_semester(session, indikator_uji):
+    """`terakhir_terisi` tahunan melewatkan tahun yang hanya punya semester."""
+    _sisip_nilai(session, tahun=2025, nilai=3.0, periode=1, label_periode="Semester 1")
+
+    assert repo_nilai.terakhir_terisi(session, "ISV-001", PROVINSI, 2025) is None
+    terakhir = repo_nilai.terakhir_terisi_termasuk_periode(session, "ISV-001", PROVINSI, 2025)
+    assert (terakhir.tahun, terakhir.nilai) == (2025, 3.0)
+
+
+def test_seri_teramati_tidak_mengisi_tahun_kosong(session, indikator_uji):
+    """Seri perhitungan hanya memuat tahun yang benar-benar punya rilis."""
+    _sisip_nilai(session, tahun=2023, nilai=8.5)
+
+    teramati = repo_nilai.seri_teramati(session, "ISV-001", PROVINSI, JenisNilai.REALISASI)
+    tampilan = repo_nilai.seri(session, "ISV-001", PROVINSI, JenisNilai.REALISASI)
+
+    assert [baris.tahun for baris in teramati] == [2023]
+    assert [baris.tahun for baris in tampilan] == [2021, 2022, 2023, 2024, 2025]
+
+
+def test_analitik_tidak_memakai_isian_celah(session, indikator_uji):
+    """Satu tahun teramati harus tetap satu titik, bukan lima titik identik."""
+    from backend.app.services.analitik import seri_realisasi
+
+    _sisip_nilai(session, tahun=2023, nilai=8.5)
+
+    assert seri_realisasi(session, "ISV-001") == [(2023, 8.5)]
+
+
 def test_nilai_belum_disetujui_tidak_terbaca(session, indikator_uji):
     _sisip_nilai(session, tahun=2025, nilai=99.0, status_verifikasi=StatusVerifikasi.MENUNGGU)
     assert repo_nilai.ambil(session, "ISV-001", PROVINSI, 2025, JenisNilai.REALISASI) is None

@@ -107,9 +107,14 @@ def detail(session: Session, indikator: Indikator, *, tahun: int | None) -> dict
 
     wilayah = []
     for daerah in repo_wilayah.daftar_anak_provinsi(session):
-        nilai = repo_nilai.ambil(session, id_indikator, daerah.kode, dipilih, JenisNilai.REALISASI) if dipilih else None
+        # Sama seperti kartu insight: rilis semester menang atas nilai tahunan.
+        nilai = (
+            repo_nilai.nilai_tampil(session, id_indikator, daerah.kode, dipilih, JenisNilai.REALISASI)
+            if dipilih
+            else None
+        )
         target_wilayah = (
-            repo_nilai.ambil(session, id_indikator, daerah.kode, dipilih, JenisNilai.TARGET) if dipilih else None
+            repo_nilai.nilai_tampil(session, id_indikator, daerah.kode, dipilih, JenisNilai.TARGET) if dipilih else None
         )
         wilayah.append(
             {

@@ -78,8 +78,11 @@ def profil_saya(pengguna: ProfilPengguna = Depends(pengguna_saat_ini)) -> dict[s
 
 @router.post("/auth/ganti-password", response_model=StatusResponse)
 def ganti_password(
+    password_lama: str = Form(...),
     password_baru: str = Form(...),
-    pengguna: ProfilPengguna = Depends(wajib_peran(*PERAN_INTERNAL)),
+    # Satu-satunya rute istimewa yang boleh dipakai akun berbendera: kalau
+    # ditutup juga, akun itu tidak punya cara keluar dari kewajibannya.
+    pengguna: ProfilPengguna = Depends(wajib_peran(*PERAN_INTERNAL, izinkan_wajib_ganti=True)),
     session: Session = Depends(get_session),
 ) -> dict[str, str]:
     if not svc.password_layak(password_baru):
@@ -87,4 +90,7 @@ def ganti_password(
     akun = repo_pengguna.ambil(session, id_terautentikasi(pengguna))
     if akun is None:
         raise HTTPException(401, "Pengguna tidak aktif")
-    return svc.ganti_password(session, akun, password_baru)
+    hasil = svc.ganti_password(session, akun, password_baru, password_lama)
+    if isinstance(hasil, svc.Ditolak):
+        raise HTTPException(hasil.kode, hasil.pesan)
+    return hasil

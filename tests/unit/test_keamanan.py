@@ -34,6 +34,13 @@ def test_kebijakan_panjang_minimum():
     assert not security.password_memenuhi_syarat("a" * 11)
 
 
+def test_kebijakan_panjang_maksimum():
+    """Batas atas dicek sebelum Argon2, supaya sandi raksasa tidak jadi beban hash."""
+    assert security.PANJANG_PASSWORD_MAKSIMUM == 128
+    assert security.password_memenuhi_syarat("a" * 128)
+    assert not security.password_memenuhi_syarat("a" * 129)
+
+
 # --- token -----------------------------------------------------------------
 
 

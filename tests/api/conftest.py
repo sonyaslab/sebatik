@@ -98,6 +98,10 @@ def _isi_benih(sesi: Session) -> None:
             indikator("ISV-002", "Tingkat kemiskinan", arah_baik="TURUN", kelompok_makro="Makro Sosial"),
             indikator("ISV-005", "Rasio gini", arah_baik="TURUN", is_proxy=True),
             indikator("IUP-001", "Usia Harapan Hidup", kelompok="Transformasi Sosial"),
+            # Disetujui tetapi tanpa satu pun baris nilai: menjaga agar tes
+            # "capaian tanpa data bukan nol" punya baris kosong sendiri, tidak
+            # menumpang pada IUP-002 yang memang disaring dari muatan publik.
+            indikator("ISV-099", "Tanpa Realisasi"),
             # Belum terverifikasi: harus tidak pernah muncul di endpoint publik.
             indikator(
                 "IUP-002",
@@ -278,6 +282,17 @@ def auth(client: TestClient) -> dict[str, str]:
     """Header Authorization untuk akun admin uji."""
     response = client.post("/api/v1/auth/login", data={"username": "admin", "password": SANDI_ADMIN})
     assert response.status_code == 200, "akun admin benih harus dapat masuk"
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+@pytest.fixture(scope="session")
+def auth_operator(client: TestClient) -> dict[str, str]:
+    """Header Authorization untuk akun operator uji (terkunci wilayah 6501)."""
+    response = client.post(
+        "/api/v1/auth/login",
+        data={"username": "operator.6501.1", "password": SANDI_ADMIN},
+    )
+    assert response.status_code == 200, "akun operator benih harus dapat masuk"
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 

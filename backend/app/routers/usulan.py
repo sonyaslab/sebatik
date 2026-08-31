@@ -16,6 +16,7 @@ from ..repositories import wilayah as repo_wilayah
 from ..repositories.pengguna import ProfilPengguna
 from ..schemas.umum import StatusResponse
 from ..schemas.usulan import DaftarBuktiResponse, DaftarUsulanResponse, UsulanDibuatResponse
+from ..services import Penolakan
 from ..services import bukti as svc_bukti
 from ..services import verifikasi as svc_verifikasi
 
@@ -32,7 +33,7 @@ async def kirim_usulan(
     tahun: int = Form(...),
     jenis: str = Form(...),
     nilai: float = Form(...),
-    periode: int | None = Form(None),
+    periode: str | None = Form(None),
     sumber: str = Form(...),
     catatan: str | None = Form(None),
     wilayah_kode: str | None = Form(None),
@@ -58,8 +59,9 @@ async def kirim_usulan(
     )
     if not repo_wilayah.ada_dan_aktif(session, lingkup):
         raise HTTPException(422, "Wilayah tidak valid")
-    if not svc_verifikasi.periode_sah(periode):
-        raise HTTPException(422, "Periode semester harus 1 atau 2")
+    periode_siap = svc_verifikasi.baca_periode(periode)
+    if isinstance(periode_siap, Penolakan):
+        raise HTTPException(periode_siap.kode, periode_siap.pesan)
 
     lampiran = [
         svc_bukti.Lampiran(nama_file=berkas.filename, isi=await berkas.read(), mime_type=berkas.content_type)
@@ -75,7 +77,7 @@ async def kirim_usulan(
         wilayah_kode=lingkup,
         tahun=tahun,
         jenis=jenis,
-        periode=periode,
+        periode=periode_siap,
         nilai=nilai,
         sumber=sumber,
         catatan=catatan,

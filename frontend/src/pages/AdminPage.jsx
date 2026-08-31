@@ -40,8 +40,13 @@ export default function AdminPage(){
     if(!token)return
     try{
       const profile=await endpoints.profilSaya()
+      setMe(profile)
+      /* Akun berbendera ditolak 403 di seluruh rute istimewa. Kalau tetap
+         dipanggil, `catch` di bawah akan membacanya sebagai sesi berakhir dan
+         login pertama terlihat seperti logout. */
+      if(profile.harus_ganti_password)return
       const [regionData,catalogData]=await Promise.all([endpoints.wilayah(),endpoints.capaianExplorer()])
-      setMe(profile);setRegions(regionData.data);setCatalog(catalogData.indikator)
+      setRegions(regionData.data);setCatalog(catalogData.indikator)
       const queue=await endpoints.daftarUsulan()
       setSubmissions(queue.data||[])
       if(profile.peran==='ADMIN'){
@@ -168,7 +173,10 @@ export default function AdminPage(){
   const submitValue=async event=>{
     event.preventDefault()
     try{
-      const result=await endpoints.kirimUsulan(new FormData(event.currentTarget))
+      const body=new FormData(event.currentTarget)
+      // Pilihan "Tahunan" mengirim string kosong; server membacanya sebagai tanpa periode.
+      if(!body.get('periode'))body.delete('periode')
+      const result=await endpoints.kirimUsulan(body)
       notifyOk(`Usulan #${result.id} dikirim untuk verifikasi.`)
       setDraft({id_indikator:'',tahun:new Date().getFullYear(),periode:'',nilai:'',sumber:'',catatan:''})
       event.currentTarget.reset()
@@ -202,6 +210,61 @@ export default function AdminPage(){
       notifyOk('Kata sandi direset dan wajib diganti saat login.')
     }catch(error){notify(error.message)}
   }
+
+  const changeOwnPassword=async event=>{
+    event.preventDefault()
+    const body=new FormData(event.currentTarget)
+    if(body.get('password_baru')!==body.get('password_ulang')){
+      notify('Konfirmasi kata sandi baru belum sama.')
+      return
+    }
+    body.delete('password_ulang')
+    try{
+      await endpoints.gantiPassword(body)
+      notifyOk('Kata sandi diganti. Ruang kerja terbuka.')
+      refresh()
+    }catch(error){notify(error.detail||error.message||'Kata sandi gagal diganti')}
+  }
+
+  /* Sandi awal yang dibagikan admin tidak boleh jadi kredensial kerja. Layar
+     ini keluar sebelum `Shell`, jadi panel yang memuat datanya sendiri
+     (UnggahExcelPanel, IndikatorManager) tidak ikut terpasang dan tidak
+     menembak rute yang memang menolaknya 403. */
+  if(me.harus_ganti_password)return <LoginShell>
+    <form className="panel role-login" onSubmit={changeOwnPassword}>
+      <SectionHead
+        kicker="Keamanan akun"
+        title="Ganti kata sandi dulu"
+        desc="Akun ini masih memakai kata sandi awal. Gantilah sebelum membuka ruang kerja."
+      />
+      {message&&<div className={`notice ${messageTone}`}>
+        {messageTone==='success'?<CheckCircle2 size={17}/>:<Info size={17}/>}
+        {message}
+      </div>}
+      <input
+        name="password_lama"
+        type="password"
+        autoComplete="current-password"
+        placeholder="Kata sandi saat ini"
+        required
+      />
+      <input
+        name="password_baru"
+        type="password"
+        autoComplete="new-password"
+        placeholder="Kata sandi baru (12-128 karakter)"
+        required
+      />
+      <input
+        name="password_ulang"
+        type="password"
+        autoComplete="new-password"
+        placeholder="Ulangi kata sandi baru"
+        required
+      />
+      <button className="login-submit">Simpan kata sandi</button>
+    </form>
+  </LoginShell>
 
   /* Ruang kerja tidak memakai pita kepala halaman. Identitas dan peran sudah
      terbaca di bilah atas, dan pita biru setinggi 300px hanya mendorong isian

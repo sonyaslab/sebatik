@@ -232,7 +232,7 @@ CATATAN_WILAYAH = "Belum ada basis data kabupaten/kota. Visualisasi akan terisi 
 
 def muatan(session: Session, indikator: Indikator, wilayah_kode: str = KODE_PROVINSI) -> dict[str, Any]:
     """Ringkasan capaian satu indikator untuk satu wilayah."""
-    seri = repo_nilai.seri(session, indikator.id_indikator, wilayah_kode)
+    seri = repo_nilai.seri_teramati(session, indikator.id_indikator, wilayah_kode)
     realisasi = [baris for baris in seri if baris.jenis == JenisNilai.REALISASI and baris.nilai is not None]
     terakhir = max(realisasi, key=lambda baris: baris.tahun) if realisasi else None
     target_setahun = next(
@@ -294,7 +294,7 @@ def daftar(session: Session, *, wilayah_kode: str = KODE_PROVINSI, **filter_akti
 def detail(session: Session, indikator: Indikator, wilayah: Wilayah, *, tahun: int | None) -> dict[str, Any]:
     """Penelusuran progres satu indikator terhadap target 2029 dan 2045."""
     id_indikator = indikator.id_indikator
-    semua = repo_nilai.seri(session, id_indikator, wilayah.kode)
+    semua = repo_nilai.seri_teramati(session, id_indikator, wilayah.kode)
     target = {baris.tahun: baris for baris in semua if baris.jenis == JenisNilai.TARGET}
     realisasi = [
         baris

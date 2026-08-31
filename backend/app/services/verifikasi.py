@@ -149,6 +149,28 @@ def periode_sah(periode: int | None) -> bool:
     return periode in PERIODE_SAH
 
 
+def baca_periode(mentah: str | int | None) -> int | Penolakan | None:
+    """Form HTML mengirim string kosong untuk "tahunan"; itu bukan angka.
+
+    Penguraiannya di service, bukan di anotasi Form, supaya jalur "kosong
+    berarti tidak ada" tidak bergantung pada versi FastAPI yang kebetulan
+    terpasang: rentang pin di `requirements.txt` memuat versi yang menolak
+    string kosong sebelum handler sempat jalan.
+    """
+    if mentah is None or mentah == "":
+        return None
+    if isinstance(mentah, int):
+        nilai = mentah
+    else:
+        try:
+            nilai = int(str(mentah).strip())
+        except (TypeError, ValueError):
+            return Penolakan(422, "Periode semester harus 1, 2, 3, atau 4")
+    if not periode_sah(nilai):
+        return Penolakan(422, "Periode semester harus 1, 2, 3, atau 4")
+    return nilai
+
+
 def ajukan(
     session: Session,
     *,

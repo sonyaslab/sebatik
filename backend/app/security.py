@@ -38,6 +38,13 @@ _hasher = PasswordHash.recommended()
 # Kebijakan yang sudah berlaku sebelumnya; dipusatkan agar tidak diulang di
 # tiga endpoint yang mengubah kata sandi.
 PANJANG_PASSWORD_MINIMUM = 12
+# Batas atas ada supaya sandi raksasa tidak pernah sampai ke Argon2: biaya hash
+# tumbuh mengikuti panjang masukan, jadi tanpa batas ini satu permintaan bisa
+# menahan pekerja server jauh lebih lama daripada permintaan biasa.
+PANJANG_PASSWORD_MAKSIMUM = 128
+# Pesan ikut tinggal di sini supaya tidak menyimpang dari angka di atasnya saat
+# kebijakannya berubah; dua service memakainya lewat alias masing-masing.
+PESAN_PANJANG_PASSWORD = f"Kata sandi harus {PANJANG_PASSWORD_MINIMUM}-{PANJANG_PASSWORD_MAKSIMUM} karakter"
 
 
 class TokenTidakValid(Exception):
@@ -53,7 +60,7 @@ def verifikasi_password(password: str, hash_tersimpan: str) -> bool:
 
 
 def password_memenuhi_syarat(password: str) -> bool:
-    return len(password) >= PANJANG_PASSWORD_MINIMUM
+    return PANJANG_PASSWORD_MINIMUM <= len(password) <= PANJANG_PASSWORD_MAKSIMUM
 
 
 def kunci_verifikasi() -> tuple[str, ...]:

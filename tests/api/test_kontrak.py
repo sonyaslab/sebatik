@@ -242,6 +242,32 @@ def test_capaian_tanpa_data_bukan_nol(_json, client):
     assert all(row["persentase_capaian"] is None for row in kosong)
 
 
+def test_indikator_publik_tanpa_yang_belum_diverifikasi(_json, client):
+    body = _json("/api/v1/indikator?page_size=200")
+    ids = [x["id_indikator"] for x in body["data"]]
+    assert "IUP-002" not in ids
+    # Sengaja tidak menguji totalnya: tes API berbagi basis data sesi dengan CRUD admin.
+
+
+def test_capaian_publik_tanpa_yang_belum_diverifikasi(_json, client):
+    ids = [x["id_indikator"] for x in _json("/api/v1/capaian")["data"]]
+    assert "IUP-002" not in ids
+
+
+def test_detail_indikator_belum_diverifikasi_404(client):
+    assert client.get("/api/v1/indikator/IUP-002/detail").status_code == 404
+
+
+def test_ekspor_csv_tanpa_yang_belum_diverifikasi(client):
+    assert "IUP-002" not in client.get("/api/v1/ekspor.csv").text
+
+
+def test_admin_melihat_indikator_belum_diverifikasi(_json, client, auth):
+    """Saringan publik tidak boleh merembes ke CRUD: draf tetap terlihat admin."""
+    ids = [x["id_indikator"] for x in _json("/api/v1/admin/indikator?page_size=200", headers=auth)["data"]]
+    assert "IUP-002" in ids
+
+
 def test_detail_indikator_legacy(_json, client):
     body = _json(f"/api/v1/indikator/{INDIKATOR_LEGACY}/detail")
     assert {"nilai", "metadata", "status_capaian", "arah_baik"} <= body.keys()
@@ -385,6 +411,50 @@ def test_admin_butuh_peran(_json, client, auth):
 def test_daftar_usulan(_json, client, auth):
     body = _json("/api/v1/admin/usulan", headers=auth)
     assert "data" in body
+
+
+def test_operator_kirim_usulan_tahunan_periode_kosong(client, auth_operator):
+    """`<select>` tahunan mengirim `periode=""`; itu harus dibaca sebagai NULL."""
+    response = client.post(
+        "/api/v1/admin/usulan",
+        headers=auth_operator,
+        data={
+            "id_indikator": "ISV-001",
+            "tahun": "2024",
+            "jenis": "realisasi",
+            "nilai": "1.23",
+            "periode": "",
+            "sumber": "Uji kontrak",
+        },
+        files={"bukti": ("bukti.pdf", b"%PDF-1.1\n%", "application/pdf")},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert {"status", "id", "jumlah_bukti"} == body.keys()
+    assert body["status"] == "MENUNGGU_VERIFIKASI"
+    assert body["jumlah_bukti"] == 1
+
+    daftar = client.get("/api/v1/admin/usulan", headers=auth_operator).json()["data"]
+    baru = next(x for x in daftar if x["id"] == body["id"])
+    assert baru["periode"] is None
+    assert baru["wilayah_kode"] == "6501"
+
+
+def test_operator_tidak_boleh_usulan_tanpa_bukti(client, auth_operator):
+    """Bukti dukung wajib; tanpa lampiran usulan ditolak sebelum tersimpan."""
+    response = client.post(
+        "/api/v1/admin/usulan",
+        headers=auth_operator,
+        data={
+            "id_indikator": "ISV-001",
+            "tahun": "2024",
+            "jenis": "realisasi",
+            "nilai": "1.23",
+            "periode": "",
+            "sumber": "Uji kontrak",
+        },
+    )
+    assert response.status_code == 422
 
 
 def test_admin_tidak_boleh_memutuskan_usulan(client, auth):

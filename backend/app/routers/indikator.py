@@ -51,7 +51,8 @@ def daftar_indikator(
 
 @router.get("/indikator/{id_indikator}/detail", response_model=DetailIndikatorResponse)
 def detail_indikator(id_indikator: str, session: Session = Depends(get_session)) -> dict[str, Any]:
-    indikator = repo_indikator.ambil(session, id_indikator)
+    # Rute publik: indikator yang belum disetujui dijawab 404, bukan ditampilkan.
+    indikator = repo_indikator.ambil_terverifikasi(session, id_indikator)
     if indikator is None:
         raise HTTPException(404, "Indikator tidak ditemukan")
     return svc.detail(session, indikator)

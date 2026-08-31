@@ -19,6 +19,6 @@ Jangan menaruh berkas plan di akar `plans/`. Plan seed/CRUD indikator yang sudah
 
 | Folder | Tanggal | Commit acuan | Isi | Status |
 |--------|---------|--------------|-----|--------|
-| [improve-29-08-2026](improve-29-08-2026/README.md) | 29 Agustus 2026 | awal `8b3ae9a`, disesuaikan `4a7939f` | 001 usulan periode kosong (TODO); 002 unggahan ID master (**DITOLAK**, sudah diperbaiki jalur Excel); 003 seri teramati (TODO); 004 ganti sandi awal (TODO); 005 katalog publik + periode (TODO) | 4 TODO, 1 DITOLAK |
+| [improve-29-08-2026](improve-29-08-2026/README.md) | 29 Agustus 2026 | awal `8b3ae9a`, disesuaikan `4a7939f` | 001 usulan periode kosong (DONE); 002 unggahan ID master (**DITOLAK**, sudah diperbaiki jalur Excel); 003 seri teramati (DONE); 004 ganti sandi awal (DONE); 005 katalog publik + periode (DONE) | 4 DONE, 1 DITOLAK |
 
 Saat `/improve` dijalankan lagi: buat folder baru dengan tanggal hari itu, jangan menimpa folder lama. Tandai batch lama `STALE` di tabel ini hanya jika temuan sudah tidak berlaku (kode berubah jauh dari commit acuan).

@@ -83,6 +83,45 @@ def nilai_periode_terbaru(
     return session.scalars(stmt).first()
 
 
+def nilai_tampil(
+    session: Session,
+    id_indikator: str,
+    wilayah_kode: str,
+    tahun: int,
+    jenis: str = JenisNilai.REALISASI,
+) -> NilaiIndikator | None:
+    """Angka yang ditampilkan: rilis periode terbaru, atau tahunan bila tidak ada.
+
+    Beranda sudah memakai aturan ini lewat `seri()`. Kartu insight dan peta
+    memakainya juga supaya wilayah yang hanya punya realisasi semester tidak
+    tampil berisi di satu halaman dan `BELUM_ADA_DATA` di halaman lain.
+    """
+    periodik = nilai_periode_terbaru(session, id_indikator, wilayah_kode, tahun, jenis)
+    if periodik is not None:
+        return periodik
+    return ambil(session, id_indikator, wilayah_kode, tahun, jenis)
+
+
+def terakhir_terisi_termasuk_periode(
+    session: Session,
+    id_indikator: str,
+    wilayah_kode: str,
+    sampai_tahun: int,
+    jenis: str = JenisNilai.REALISASI,
+) -> NilaiIndikator | None:
+    """Nilai terisi paling akhir, tahunan atau periodik, hingga `sampai_tahun`."""
+    stmt = (
+        _lingkup(select(NilaiIndikator), id_indikator, wilayah_kode, jenis, tahunan=False)
+        .where(
+            NilaiIndikator.tahun <= sampai_tahun,
+            (NilaiIndikator.nilai.is_not(None)) | (NilaiIndikator.nilai_teks.is_not(None)),
+        )
+        .order_by(NilaiIndikator.tahun.desc(), NilaiIndikator.periode.desc().nullslast())
+        .limit(1)
+    )
+    return session.scalars(stmt).first()
+
+
 def sebelum_tahun(
     session: Session,
     id_indikator: str,
@@ -120,6 +159,29 @@ def terakhir_terisi(
     return session.scalars(stmt).first()
 
 
+def seri_teramati(
+    session: Session,
+    id_indikator: str,
+    wilayah_kode: str,
+    jenis: str | None = None,
+) -> list[NilaiIndikator]:
+    """Rilis disetujui apa adanya: periode terbaru menang, tahun kosong tetap kosong.
+
+    Dipakai perhitungan — analitik, capaian, dan seri YoY insight — yang jawabannya
+    berubah kalau satu tahun teramati dilipatgandakan menjadi lima titik identik:
+    pertumbuhan jadi nol dan `n` korelasi menggembung. Yang butuh grafik utuh
+    memakai `seri()`.
+    """
+    stmt = _lingkup(select(NilaiIndikator), id_indikator, wilayah_kode, jenis, tahunan=False).order_by(
+        NilaiIndikator.tahun, NilaiIndikator.jenis, NilaiIndikator.periode.asc().nullsfirst()
+    )
+    semua = list(session.scalars(stmt))
+    # Karena periodenya diurutkan menaik, penetapan terakhir pada kunci yang
+    # sama adalah rilis semester/triwulan paling mutakhir.
+    terpilih = {(baris.tahun, baris.jenis): baris for baris in semua}
+    return [terpilih[kunci] for kunci in sorted(terpilih)]
+
+
 def seri(
     session: Session,
     id_indikator: str,
@@ -132,13 +194,9 @@ def seri(
     fakta. Saat nilai asli untuk tahun tersebut disetujui, hasil query berikutnya
     otomatis memakai nilai asli itu.
     """
-    stmt = _lingkup(select(NilaiIndikator), id_indikator, wilayah_kode, jenis, tahunan=False).order_by(
-        NilaiIndikator.tahun, NilaiIndikator.jenis, NilaiIndikator.periode.asc().nullsfirst()
-    )
-    semua = list(session.scalars(stmt))
-    # Karena periodenya diurutkan menaik, penetapan terakhir pada kunci yang
-    # sama adalah rilis semester/triwulan paling mutakhir.
-    terpilih = {(baris.tahun, baris.jenis): baris for baris in semua}
+    terpilih = {
+        (baris.tahun, baris.jenis): baris for baris in seri_teramati(session, id_indikator, wilayah_kode, jenis)
+    }
     realisasi = {
         tahun: baris
         for (tahun, jenis_baris), baris in terpilih.items()

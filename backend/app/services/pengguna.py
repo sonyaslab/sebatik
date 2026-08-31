@@ -15,10 +15,10 @@ from ..models import KODE_PROVINSI, PERAN, Pengguna, Peran
 from ..repositories import pengguna as repo_pengguna
 from ..repositories import tata_kelola as repo_tata_kelola
 from ..repositories import wilayah as repo_wilayah
-from ..security import PANJANG_PASSWORD_MINIMUM, hash_password, password_memenuhi_syarat
+from ..security import PESAN_PANJANG_PASSWORD, hash_password, password_memenuhi_syarat
 from . import Penolakan
 
-PESAN_PASSWORD_PENDEK = f"Kata sandi minimal {PANJANG_PASSWORD_MINIMUM} karakter"
+PESAN_PASSWORD_PENDEK = PESAN_PANJANG_PASSWORD
 # Peran yang terikat pada satu wilayah kerja.
 PERAN_BERWILAYAH = (Peran.OPERATOR, Peran.VERIFIKATOR)
 

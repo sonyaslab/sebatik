@@ -116,7 +116,7 @@ def seri_realisasi(session: Session, id_indikator: str) -> list[tuple[int, float
     """Pasangan (tahun, nilai) realisasi tahunan yang benar-benar berangka."""
     return [
         (baris.tahun, float(baris.nilai))
-        for baris in repo_nilai.seri(session, id_indikator, KODE_PROVINSI, JenisNilai.REALISASI)
+        for baris in repo_nilai.seri_teramati(session, id_indikator, KODE_PROVINSI, JenisNilai.REALISASI)
         if baris.nilai is not None
     ]
 
@@ -167,7 +167,7 @@ def muatan_gap(session: Session, indikator: Any) -> dict[str, Any]:
 
     target = {
         baris.tahun: baris.nilai
-        for baris in repo_nilai.seri(session, id_indikator, KODE_PROVINSI, JenisNilai.TARGET)
+        for baris in repo_nilai.seri_teramati(session, id_indikator, KODE_PROVINSI, JenisNilai.TARGET)
         if baris.tahun in (TAHUN_TARGET_ANTARA, TAHUN_TARGET_AKHIR) and baris.nilai is not None
     }
     tahun_terakhir, nilai_terakhir = realisasi[-1]
@@ -211,7 +211,7 @@ def muatan_multi(session: Session, ids: Sequence[str]) -> dict[str, Any] | Penol
                 "nama": indikator.nama_indikator,
                 "seri": [
                     {"tahun": baris.tahun, "jenis": baris.jenis, "nilai": baris.nilai}
-                    for baris in repo_nilai.seri(session, indikator.id_indikator, KODE_PROVINSI)
+                    for baris in repo_nilai.seri_teramati(session, indikator.id_indikator, KODE_PROVINSI)
                     if baris.nilai is not None
                 ],
             }

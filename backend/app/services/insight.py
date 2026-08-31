@@ -26,7 +26,7 @@ CATATAN_WILAYAH = (
 
 def _kartu(session: Session, indikator: Any, wilayah_kode: str, tahun_sistem: int) -> tuple[dict[str, Any], int | None]:
     iid = indikator.id_indikator
-    terakhir = repo_nilai.terakhir_terisi(session, iid, wilayah_kode, tahun_sistem)
+    terakhir = repo_nilai.terakhir_terisi_termasuk_periode(session, iid, wilayah_kode, tahun_sistem)
     tahun_terakhir = terakhir.tahun if terakhir else None
     sebelumnya = (
         repo_nilai.sebelum_tahun(session, iid, wilayah_kode, tahun_terakhir) if tahun_terakhir is not None else None
@@ -70,7 +70,7 @@ def _kartu(session: Session, indikator: Any, wilayah_kode: str, tahun_sistem: in
 def _seri(session: Session, id_indikator: str, wilayah_kode: str) -> list[dict[str, Any]]:
     hasil: list[dict[str, Any]] = []
     sebelumnya: float | None = None
-    for baris in repo_nilai.seri(session, id_indikator, wilayah_kode, JenisNilai.REALISASI):
+    for baris in repo_nilai.seri_teramati(session, id_indikator, wilayah_kode, JenisNilai.REALISASI):
         angka = svc_nilai.angka_terakhir(baris.nilai, baris.nilai_teks)
         if angka is None:
             continue
@@ -112,7 +112,7 @@ def susun(session: Session, wilayah: Wilayah, *, indikator_id: str | None) -> di
     perbandingan = []
     for daerah in repo_wilayah.daftar_anak_provinsi(session):
         nilai = (
-            repo_nilai.ambil(session, dipilih, daerah.kode, tahun_aktif, JenisNilai.REALISASI)
+            repo_nilai.nilai_tampil(session, dipilih, daerah.kode, tahun_aktif, JenisNilai.REALISASI)
             if dipilih and tahun_aktif
             else None
         )

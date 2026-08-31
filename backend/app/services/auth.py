@@ -20,7 +20,8 @@ from sqlalchemy.orm import Session
 from ..models import Pengguna
 from ..repositories import pengguna as repo_pengguna
 from ..security import (
-    PANJANG_PASSWORD_MINIMUM,
+    PANJANG_PASSWORD_MAKSIMUM,
+    PESAN_PANJANG_PASSWORD,
     TIPE_SEGAR,
     TokenTidakValid,
     baca_token,
@@ -34,10 +35,11 @@ from .pembatas import kunci_percobaan, pembatas_login
 
 log = logging.getLogger("sebatik.auth")
 
-PESAN_PASSWORD_PENDEK = f"Kata sandi minimal {PANJANG_PASSWORD_MINIMUM} karakter"
+PESAN_PASSWORD_PENDEK = PESAN_PANJANG_PASSWORD
 # Pesan yang sama untuk username salah dan sandi salah, agar tidak
 # membocorkan username mana yang terdaftar.
 PESAN_KREDENSIAL_SALAH = "Username atau kata sandi salah"
+PESAN_SANDI_LAMA_SALAH = "Kata sandi saat ini salah"
 PESAN_TERLALU_SERING = "Terlalu banyak percobaan masuk. Coba lagi beberapa saat lagi."
 NAMA_COOKIE_SEGAR = "sebatik_segar"
 # Cookie hanya dikirim ke jalur yang benar-benar memakainya.
@@ -86,7 +88,10 @@ def masuk(session: Session, *, username: str, password: str, ip: str | None) -> 
         catat_peristiwa("masuk", username=username, hasil="dibatasi", ip=ip)
         return Ditolak(429, PESAN_TERLALU_SERING, {"Retry-After": str(keputusan.sisa_detik)})
 
-    akun = repo_pengguna.ambil_untuk_login(session, username)
+    # Sandi di luar batas panjang tidak mungkin cocok dengan hash yang tersimpan,
+    # jadi dijawab seperti kredensial salah tanpa membayar biaya Argon2.
+    terlalu_panjang = len(password) > PANJANG_PASSWORD_MAKSIMUM
+    akun = None if terlalu_panjang else repo_pengguna.ambil_untuk_login(session, username)
     if akun is None or not verifikasi_password(password, akun.password_hash):
         catat_peristiwa("masuk", username=username, hasil="gagal", ip=ip)
         return Ditolak(401, PESAN_KREDENSIAL_SALAH)
@@ -116,7 +121,17 @@ def segarkan(session: Session, token_segar: str | None) -> Sesi | Ditolak:
     return _sesi(akun)
 
 
-def ganti_password(session: Session, akun: Pengguna, password_baru: str) -> dict[str, str]:
+def ganti_password(
+    session: Session, akun: Pengguna, password_baru: str, password_lama: str
+) -> dict[str, str] | Ditolak:
+    """Ganti sandi sendiri; sandi saat ini wajib dibuktikan lebih dulu.
+
+    Tanpa syarat itu, siapa pun yang memegang token akses curian bisa mengunci
+    pemilik akun dengan sandi baru.
+    """
+    if not verifikasi_password(password_lama, akun.password_hash):
+        catat_peristiwa("ganti_password", pengguna_id=akun.id, hasil="sandi_lama_salah")
+        return Ditolak(401, PESAN_SANDI_LAMA_SALAH)
     repo_pengguna.ganti_password(akun, hash_password(password_baru), wajib_ganti=False)
     session.commit()
     catat_peristiwa("ganti_password", pengguna_id=akun.id, hasil="berhasil")

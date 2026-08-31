@@ -103,8 +103,14 @@ def cari(
     order: str = "asc",
     page: int = 1,
     page_size: int = 25,
+    hanya_terverifikasi: bool = False,
 ) -> tuple[list[Indikator], int]:
-    """Halaman hasil beserta totalnya (untuk endpoint `/indikator`)."""
+    """Halaman hasil beserta totalnya (untuk endpoint `/indikator`).
+
+    Saringan status ikut sebagai parameter, bukan dipasang mati: pemanggilnya
+    ada dua — katalog publik yang hanya boleh melihat indikator disetujui, dan
+    CRUD admin yang justru perlu melihat drafnya.
+    """
 
     def disaring(stmt: Select) -> Select:
         return _saring(stmt, q, kategori, kelompok, tim, status_metadata)
@@ -115,16 +121,24 @@ def cari(
     kolom = kolom_urut.get(sort, Indikator.id_indikator)
     arah = desc if order == "desc" else asc
 
-    daftar = session.scalars(
-        disaring(select(Indikator)).order_by(arah(kolom)).offset((page - 1) * page_size).limit(page_size)
-    ).all()
-    total = session.scalar(disaring(select(func.count()).select_from(Indikator))) or 0
+    stmt = disaring(select(Indikator))
+    hitung = disaring(select(func.count()).select_from(Indikator))
+    if hanya_terverifikasi:
+        stmt = _terverifikasi(stmt)
+        hitung = _terverifikasi(hitung)
+
+    daftar = session.scalars(stmt.order_by(arah(kolom)).offset((page - 1) * page_size).limit(page_size)).all()
+    total = session.scalar(hitung) or 0
     return list(daftar), total
 
 
 def daftar_ekspor(session: Session) -> list[Indikator]:
-    """Urutan ekspor: IUP lalu ISV (kategori menurun), lalu nomor urut."""
-    stmt = select(Indikator).order_by(Indikator.kategori.desc(), Indikator.nomor)
+    """Urutan ekspor: IUP lalu ISV (kategori menurun), lalu nomor urut.
+
+    Pemanggilnya semuanya publik (`/capaian` dan unduhan), jadi saringannya
+    tetap di sini dan tidak perlu jadi parameter.
+    """
+    stmt = _terverifikasi(select(Indikator)).order_by(Indikator.kategori.desc(), Indikator.nomor)
     return list(session.scalars(stmt))
 
 

@@ -56,12 +56,21 @@ def pengguna_saat_ini(
     return repo_pengguna.profil(akun)
 
 
-def wajib_peran(*peran: str):
-    """Dependency yang menolak 403 bila peran pengguna tidak termasuk."""
+def wajib_peran(*peran: str, izinkan_wajib_ganti: bool = False):
+    """Dependency yang menolak 403 bila peran pengguna tidak termasuk.
+
+    Akun yang masih menyandang `harus_ganti_password` juga ditolak: sandi awal
+    yang tercetak saat akun dibuat tidak boleh terus menjadi kredensial
+    istimewa. Gerbangnya di sini, bukan di `pengguna_saat_ini`, supaya
+    `/auth/saya` dan `/auth/logout` tetap dapat dipakai layar ganti sandi.
+    Rute ganti sandi itu sendiri lewat dengan `izinkan_wajib_ganti=True`.
+    """
 
     def dependency(pengguna: ProfilPengguna = Depends(pengguna_saat_ini)) -> ProfilPengguna:
         if pengguna.peran not in peran:
             raise HTTPException(403, "Akses tidak diizinkan")
+        if pengguna.harus_ganti_password and not izinkan_wajib_ganti:
+            raise HTTPException(403, "Wajib mengganti kata sandi sebelum melanjutkan")
         return pengguna
 
     return dependency

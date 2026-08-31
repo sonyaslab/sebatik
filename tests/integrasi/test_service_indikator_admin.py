@@ -56,18 +56,17 @@ def test_periksa_konsistensi_id(id_indikator, kategori, nomor, valid):
         assert penolakan.kode == 422
 
 
-def test_periksa_konfirmasi_penghapusan_menolak_teks_yang_tidak_cocok():
+def test_periksa_konfirmasi_penghapusan_menuntut_bendera_konfirmasi():
     """Penjaga penghapusan kini konfirmasi eksplisit, bukan larangan sepihak.
 
-    Admin boleh menghapus indikator berisi nilai; yang wajib adalah menyebut
-    ulang id-nya, supaya penghapusan tidak pernah terjadi karena salah pencet.
+    Admin boleh menghapus indikator berisi nilai; yang wajib adalah bendera
+    konfirmasi, supaya penghapusan tidak pernah terjadi karena salah pencet.
     """
-    penolakan = svc.periksa_konfirmasi_penghapusan("ISV-999", "ISV-000")
+    penolakan = svc.periksa_konfirmasi_penghapusan(False)
     assert penolakan is not None
     assert penolakan.kode == 400
 
-    assert svc.periksa_konfirmasi_penghapusan("ISV-999", "") is not None
-    assert svc.periksa_konfirmasi_penghapusan("ISV-999", "ISV-999") is None
+    assert svc.periksa_konfirmasi_penghapusan(True) is None
 
 
 def test_hapus_indikator_membuang_nilai_dan_usulannya(session):

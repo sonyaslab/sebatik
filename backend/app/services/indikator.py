@@ -61,6 +61,8 @@ def cari(
         order=order,
         page=page,
         page_size=page_size,
+        # Katalog publik tidak boleh memuat indikator yang belum disetujui.
+        hanya_terverifikasi=True,
     )
     return {
         "data": [ringkas(item) for item in daftar],

@@ -1,0 +1,133 @@
+[1mdiff --git a/jalankan-sebatik.ps1 b/jalankan-sebatik.ps1[m
+[1mindex 87e5ab3..cddcc4c 100644[m
+[1m--- a/jalankan-sebatik.ps1[m
+[1m+++ b/jalankan-sebatik.ps1[m
+[36m@@ -2,15 +2,49 @@[m [m$ErrorActionPreference = 'Stop'[m
+ $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path[m
+ $PythonExe = Join-Path $ProjectRoot '.venv-sebatik\Scripts\python.exe'[m
+ Set-Location $ProjectRoot[m
+[32m+[m
+[32m+[m[32m# `.env` produksi memakai nama layanan Docker `db`. Saat backend dijalankan[m
+[32m+[m[32m# langsung dari Windows, nama itu tidak tersedia; PostgreSQL dijangkau lewat[m
+[32m+[m[32m# port host yang dipublikasikan oleh Docker Compose.[m
+[32m+[m[32m$EnvFile = Join-Path $ProjectRoot '.env'[m
+[32m+[m[32mif (Test-Path $EnvFile) {[m
+[32m+[m[32m    $DatabaseLine = Get-Content $EnvFile | Where-Object { $_ -match '^SEBATIK_DATABASE_URL=' } | Select-Object -Last 1[m
+[32m+[m[32m    if ($DatabaseLine) {[m
+[32m+[m[32m        $DatabaseUrl = $DatabaseLine.Substring('SEBATIK_DATABASE_URL='.Length)[m
+[32m+[m[32m        if ($DatabaseUrl -match '@db:5432(?=/|$)') {[m
+[32m+[m[32m            $PortLine = Get-Content $EnvFile | Where-Object { $_ -match '^POSTGRES_HOST_PORT=' } | Select-Object -Last 1[m
+[32m+[m[32m            $HostPort = if ($PortLine) { $PortLine.Substring('POSTGRES_HOST_PORT='.Length) } else { '5434' }[m
+[32m+[m[32m            $env:SEBATIK_DATABASE_URL = $DatabaseUrl -replace '@db:5432(?=/|$)', "@127.0.0.1:$HostPort"[m
+[32m+[m[32m            Write-Host "Mode lokal: PostgreSQL Docker di 127.0.0.1:$HostPort" -ForegroundColor Cyan[m
+[32m+[m
+[32m+[m[32m            $TcpClient = [System.Net.Sockets.TcpClient]::new()[m
+[32m+[m[32m            try {[m
+[32m+[m[32m                $Connection = $TcpClient.ConnectAsync('127.0.0.1', [int]$HostPort)[m
+[32m+[m[32m                if (-not $Connection.Wait(1500) -or -not $TcpClient.Connected) {[m
+[32m+[m[32m                    throw 'PostgreSQL lokal belum siap.'[m
+[32m+[m[32m                }[m
+[32m+[m[32m            } catch {[m
+[32m+[m[32m                throw "PostgreSQL belum tersedia di port $HostPort. Nyalakan Docker Desktop, lalu jalankan: docker compose up -d db"[m
+[32m+[m[32m            } finally {[m
+[32m+[m[32m                $TcpClient.Dispose()[m
+[32m+[m[32m            }[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m[32m}[m
+[32m+[m
+ if (-not (Test-Path 'frontend\dist\index.html')) {[m
+     throw 'Frontend belum dibangun. Jalankan pnpm install dan pnpm build di folder frontend.'[m
+ }[m
+ $FallbackPython = Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'[m
+ $LocalPackages = Join-Path $ProjectRoot '.runtime-packages'[m
+[31m-if ((Test-Path $FallbackPython) -and (Test-Path $LocalPackages)) {[m
+[31m-    & $FallbackPython scripts\run_local_server.py[m
+[31m-} elseif (Test-Path $PythonExe) {[m
+[32m+[m[32mif (Test-Path $PythonExe) {[m
+[32m+[m[32m    & $PythonExe -c 'import fastapi, pydantic_settings, sqlalchemy, uvicorn' *> $null[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mif ((Test-Path $PythonExe) -and ($LASTEXITCODE -eq 0)) {[m
+     & $PythonExe -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000[m
+[32m+[m[32m} elseif ((Test-Path $FallbackPython) -and (Test-Path $LocalPackages)) {[m
+[32m+[m[32m    & $FallbackPython scripts\run_local_server.py[m
+ } else {[m
+     throw 'Runtime Python belum tersedia. Jalankan .\pasang-sebatik.ps1 terlebih dahulu.'[m
+ }[m
+[1mdiff --git a/pasang-sebatik.ps1 b/pasang-sebatik.ps1[m
+[1mindex c9a6655..87c36a0 100644[m
+[1m--- a/pasang-sebatik.ps1[m
+[1m+++ b/pasang-sebatik.ps1[m
+[36m@@ -2,9 +2,69 @@[m [m$ErrorActionPreference = 'Stop'[m
+ $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path[m
+ Set-Location $ProjectRoot[m
+ [m
+[31m-python -m venv .venv-sebatik[m
+[32m+[m[32m# `.env` produksi memakai hostname internal Docker `db`. Perintah Alembic dan[m
+[32m+[m[32m# seed di bawah berjalan dari Windows, sehingga gunakan port host PostgreSQL.[m
+[32m+[m[32m$EnvFile = Join-Path $ProjectRoot '.env'[m
+[32m+[m[32mif (Test-Path $EnvFile) {[m
+[32m+[m[32m    $DatabaseLine = Get-Content $EnvFile | Where-Object { $_ -match '^SEBATIK_DATABASE_URL=' } | Select-Object -Last 1[m
+[32m+[m[32m    if ($DatabaseLine) {[m
+[32m+[m[32m        $DatabaseUrl = $DatabaseLine.Substring('SEBATIK_DATABASE_URL='.Length)[m
+[32m+[m[32m        if ($DatabaseUrl -match '@db:5432(?=/|$)') {[m
+[32m+[m[32m            $PortLine = Get-Content $EnvFile | Where-Object { $_ -match '^POSTGRES_HOST_PORT=' } | Select-Object -Last 1[m
+[32m+[m[32m            $HostPort = if ($PortLine) { $PortLine.Substring('POSTGRES_HOST_PORT='.Length) } else { '5434' }[m
+[32m+[m[32m            $env:SEBATIK_DATABASE_URL = $DatabaseUrl -replace '@db:5432(?=/|$)', "@127.0.0.1:$HostPort"[m
+[32m+[m[32m            Write-Host "Mode lokal: PostgreSQL Docker di 127.0.0.1:$HostPort" -ForegroundColor Cyan[m
+[32m+[m
+[32m+[m
+[32m+[m[32m            $TcpClient = [System.Net.Sockets.TcpClient]::new()[m
+[32m+[m[32m            try {[m
+[32m+[m[32m                $Connection = $TcpClient.ConnectAsync('127.0.0.1', [int]$HostPort)[m
+[32m+[m[32m                if (-not $Connection.Wait(1500) -or -not $TcpClient.Connected) {[m
+[32m+[m[32m                    throw 'PostgreSQL lokal belum siap.'[m
+[32m+[m[32m                }[m
+[32m+[m[32m            } catch {[m
+[32m+[m[32m                throw "PostgreSQL belum tersedia di port $HostPort. Nyalakan Docker Desktop, lalu jalankan: docker compose up -d db"[m
+[32m+[m[32m            } finally {[m
+[32m+[m[32m                $TcpClient.Dispose()[m
+[32m+[m[32m            }[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m$PythonCommand = Get-Command python -ErrorAction SilentlyContinue[m
+[32m+[m[32m$FallbackPython = Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'[m
+[32m+[m[32mif ($PythonCommand) {[m
+[32m+[m[32m    & $PythonCommand.Source -c 'import sys; print(sys.executable)' *> $null[m
+[32m+[m[32m}[m
+[32m+[m[32mif ($PythonCommand -and ($LASTEXITCODE -eq 0)) {[m
+[32m+[m[32m    $BasePython = $PythonCommand.Source[m
+[32m+[m[32m} elseif (Test-Path $FallbackPython) {[m
+[32m+[m[32m    $BasePython = $FallbackPython[m
+[32m+[m[32m} else {[m
+[32m+[m[32m    throw 'Python 3.11 atau lebih baru belum tersedia. Pasang Python, lalu jalankan skrip ini kembali.'[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m$ExistingPython = Join-Path $ProjectRoot '.venv-sebatik\Scripts\python.exe'[m
+[32m+[m[32m$PaksaPasang = $false[m
+[32m+[m[32mif (Test-Path $ExistingPython) {[m
+[32m+[m[32m    & $ExistingPython -c 'import fastapi, pydantic_settings, sqlalchemy, uvicorn' *> $null[m
+[32m+[m[32m    if ($LASTEXITCODE -ne 0) {[m
+[32m+[m[32m        Write-Host 'Virtual environment lama rusak; membuatnya ulang...' -ForegroundColor Yellow[m
+[32m+[m[32m        # `--upgrade` memperbarui referensi absolut interpreter di pyvenv.cfg.[m
+[32m+[m[32m        # Paket biner kemudian wajib dipasang ulang untuk versi Python baru.[m
+[32m+[m[32m        & $BasePython -m venv --upgrade .venv-sebatik[m
+[32m+[m[32m        $PaksaPasang = $true[m
+[32m+[m[32m    }[m
+[32m+[m[32m} else {[m
+[32m+[m[32m    & $BasePython -m venv .venv-sebatik[m
+[32m+[m[32m}[m
+[32m+[m
+ $Python = Join-Path $ProjectRoot '.venv-sebatik\Scripts\python.exe'[m
+[31m-& $Python -m pip install -r requirements.txt[m
+[32m+[m[32mif ($PaksaPasang) {[m
+[32m+[m[32m    & $Python -m pip install --force-reinstall -r requirements.txt[m
+[32m+[m[32m} else {[m
+[32m+[m[32m    & $Python -m pip install -r requirements.txt[m
+[32m+[m[32m}[m
+ [m
+ Push-Location frontend[m
+ try {[m
