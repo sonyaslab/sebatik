@@ -61,3 +61,17 @@ def test_nilai_id_indikator_semuanya_dikenal():
 def test_tidak_ada_duplikat_kunci_nilai():
     kunci = [(b["id_indikator"], b["tahun"], b["jenis"]) for b in _muatan()["nilai_indikator"]]
     assert len(kunci) == len(set(kunci))
+
+
+def test_klasifikasi_makro_fixture_lengkap_dan_berjumlah_dua_puluh_satu():
+    indikator = _muatan()["indikator"]
+    assert all(baris.get("kelompok_makro") for baris in indikator)
+    makro = [baris for baris in indikator if baris["kelompok_makro"].startswith("Makro")]
+    assert len(makro) == 21
+    assert {baris["id_indikator"] for baris in makro} >= {
+        "ISV-001",
+        "ISV-004",
+        "ISV-005",
+        "IUP-028",
+        "IUP-050",
+    }

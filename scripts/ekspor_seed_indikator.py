@@ -65,6 +65,10 @@ KOLOM_CATATAN = (
 
 def _header(ws: Any) -> dict[str, int]:
     """Label header (baris 1) -> nomor kolom, sepola dengan src/etl/extract/master.py."""
+    # Workbook hasil ekspor beberapa alat tidak selalu menulis dimensi sheet.
+    # Openpyxl read-only baru menghitung max_row/max_column setelah dipaksa.
+    if ws.max_column is None or ws.max_row is None:
+        ws.calculate_dimension(force=True)
     hasil: dict[str, int] = {}
     for kolom in range(1, ws.max_column + 1):
         label = clean_text(ws.cell(1, kolom).value)
@@ -124,6 +128,7 @@ def baca_indikator_dan_metadata(wb: Any) -> tuple[list[dict[str, Any]], list[dic
                 "kelompok": clean_text(sel(baris, "Kelompok / Pilar")),
                 "arah_pembangunan": arah_pembangunan,
                 "arah_ie": arah_ie,
+                "kelompok_makro": clean_text(sel(baris, "Kelompok Makro")),
                 "opd_pengampu": clean_text(sel(baris, "Perangkat Daerah Pengampu (Kaltara)")),
                 "sumber_data": sumber_data,
                 "frekuensi": frekuensi,

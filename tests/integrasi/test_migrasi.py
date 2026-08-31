@@ -10,8 +10,10 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.orm import Session
 
+from backend.app.cli import seed_indikator
 from backend.app.models import Base
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -87,6 +89,31 @@ def test_upgrade_lalu_downgrade_bersih(db_kosong: str):
             os.environ.pop("SEBATIK_DATABASE_URL", None)
         else:
             os.environ["SEBATIK_DATABASE_URL"] = lama
+
+
+def test_migrasi_0004_mengisi_klasifikasi_makro_pada_database_terpasang(db_kosong: str):
+    """Deploy lama tidak menjalankan seed ulang karena tabel indikator sudah berisi."""
+    config = _config(db_kosong)
+    command.upgrade(config, "0003_kode_sdgs_text")
+    mesin = create_engine(db_kosong)
+    with Session(mesin) as session:
+        assert seed_indikator(session) == 86
+        session.execute(text("UPDATE indikator SET kelompok_makro = NULL"))
+        session.commit()
+
+    command.upgrade(config, "0004_klasifikasi_makro")
+    with mesin.connect() as koneksi:
+        baris = koneksi.execute(
+            text("SELECT id_indikator, kelompok_makro FROM indikator WHERE kelompok_makro LIKE 'Makro%'")
+        ).all()
+        belum_diklasifikasikan = koneksi.scalar(
+            text("SELECT COUNT(*) FROM indikator WHERE kelompok_makro IS NULL OR trim(kelompok_makro) = ''")
+        )
+    mesin.dispose()
+
+    assert len(baris) == 21
+    assert belum_diklasifikasikan == 0
+    assert dict(baris)["IUP-050"] == "Makro - Harga"
 
 
 def test_nilai_indikator_menggantikan_enam_tabel_lama(engine_uji):

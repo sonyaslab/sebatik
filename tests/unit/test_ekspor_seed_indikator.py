@@ -36,6 +36,7 @@ HEADER_INDIKATOR = [
     "Catatan Kualitas Data",
     "Keterangan (Rakor Kaltara)",
     "Keterangan RPJMD / Catatan Kaltara",
+    "Kelompok Makro",
 ]
 
 
@@ -139,6 +140,38 @@ def test_nomor_diturunkan_dari_suffix_id():
     indikator, _metadata = baca_indikator_dan_metadata(wb)
     assert indikator[0]["nomor"] == 87
     assert indikator[0]["kode_indikator"] == "87"
+
+
+def test_kelompok_makro_dibaca_dari_master():
+    wb = _wb_indikator(
+        [
+            [
+                "ISV-001",
+                "ISV",
+                "Kelompok",
+                "Arah",
+                "1",
+                "Nama",
+                "Tidak",
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                "Makro - Ekonomi",
+            ]
+        ]
+    )
+    indikator, _metadata = baca_indikator_dan_metadata(wb)
+    assert indikator[0]["kelompok_makro"] == "Makro - Ekonomi"
 
 
 def test_catatan_tiga_kolom_digabung_dengan_prefiks_dan_kolom_kosong_dilewati():
