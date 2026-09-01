@@ -75,3 +75,15 @@ def test_klasifikasi_makro_fixture_lengkap_dan_berjumlah_dua_puluh_satu():
         "IUP-028",
         "IUP-050",
     }
+
+
+def test_empat_lapis_kerangka_fixture_lengkap():
+    indikator = _muatan()["indikator"]
+    isv = [baris for baris in indikator if baris["kategori"] == "ISV"]
+    iup = [baris for baris in indikator if baris["kategori"] == "IUP"]
+
+    assert len({baris["sasaran_visi"] for baris in isv}) == 5
+    assert all(baris["sasaran_visi"] for baris in isv)
+    assert len({baris["misi_agenda"] for baris in iup}) == 5
+    assert len({baris["arah_ie"] for baris in iup}) == 17
+    assert len({baris["indikator_induk"] for baris in iup}) == 45

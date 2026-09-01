@@ -74,7 +74,7 @@ def label_periode(periode: int | None, periode_data: str | None = None) -> str |
     return f"{jenis} {periode}"
 
 
-def putuskan(
+def _terapkan_keputusan(
     session: Session,
     usulan: UsulanNilai,
     *,
@@ -82,11 +82,6 @@ def putuskan(
     alasan: str | None,
     verifikator_id: int,
 ) -> None:
-    """Terapkan keputusan verifikasi dalam satu transaksi.
-
-    Pemanggil bertanggung jawab menjalankan validasi (`periksa_keputusan`)
-    lebih dulu; fungsi ini hanya menulis.
-    """
     waktu = datetime.now(UTC)
 
     if keputusan == StatusVerifikasi.DISETUJUI:
@@ -100,7 +95,8 @@ def putuskan(
             tahun=usulan.tahun,
             jenis=usulan.jenis,
             periode=usulan.periode,
-            nilai=float(usulan.nilai),
+            nilai=float(usulan.nilai) if usulan.nilai is not None else None,
+            nilai_teks=usulan.nilai_teks,
             label_periode=label_periode(usulan.periode, indikator.periode_data if indikator else None),
             sumber=usulan.sumber,
             usulan_id=usulan.id,
@@ -113,7 +109,7 @@ def putuskan(
             id_indikator=usulan.id_indikator,
             field="nilai",
             nilai_lama=None if nilai_lama is None else str(nilai_lama),
-            nilai_baru=str(usulan.nilai),
+            nilai_baru=str(usulan.nilai if usulan.nilai is not None else usulan.nilai_teks),
             sumber_perubahan="form",
             referensi_id=str(usulan.id),
             catatan=usulan.catatan,
@@ -139,7 +135,46 @@ def putuskan(
             "wilayah": usulan.wilayah_kode,
         },
     )
+
+
+def putuskan(
+    session: Session,
+    usulan: UsulanNilai,
+    *,
+    keputusan: str,
+    alasan: str | None,
+    verifikator_id: int,
+) -> None:
+    """Terapkan satu keputusan verifikasi dalam satu transaksi."""
+    _terapkan_keputusan(
+        session,
+        usulan,
+        keputusan=keputusan,
+        alasan=alasan,
+        verifikator_id=verifikator_id,
+    )
     session.commit()
+
+
+def putuskan_massal(
+    session: Session,
+    usulan: Sequence[UsulanNilai],
+    *,
+    keputusan: str,
+    alasan: str | None,
+    verifikator_id: int,
+) -> int:
+    """Putuskan seluruh baris satu batch secara atomik."""
+    for item in usulan:
+        _terapkan_keputusan(
+            session,
+            item,
+            keputusan=keputusan,
+            alasan=alasan,
+            verifikator_id=verifikator_id,
+        )
+    session.commit()
+    return len(usulan)
 
 
 PERIODE_SAH = (None, 1, 2, 3, 4)
@@ -180,6 +215,7 @@ def ajukan(
     jenis: str,
     periode: int | None,
     nilai: float,
+    nilai_teks: str | None = None,
     sumber: str,
     catatan: str | None,
     pengusul_id: int,
@@ -198,6 +234,7 @@ def ajukan(
         jenis=jenis,
         periode=periode,
         nilai=nilai,
+        nilai_teks=nilai_teks,
         sumber=sumber,
         catatan=catatan,
         pengusul_id=pengusul_id,

@@ -49,6 +49,11 @@ def jumlah(session: Session) -> int:
     return session.scalar(select(func.count()).select_from(Indikator)) or 0
 
 
+def semua_ringkas(session: Session) -> list[Indikator]:
+    """Daftar indikator tanpa relasi; dipakai validasi unggahan massal."""
+    return list(session.scalars(select(Indikator).order_by(Indikator.id_indikator)))
+
+
 def seed_massal(
     session: Session,
     indikator: list[dict[str, object]],

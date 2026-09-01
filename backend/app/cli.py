@@ -19,6 +19,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from .config import settings
 from .database import SessionLocal
 from .models import KODE_PROVINSI, Peran, Wilayah
 from .repositories import indikator as repo_indikator
@@ -46,6 +47,7 @@ OPERATOR_PER_WILAYAH = 2
 # Fixture di-generate scripts/ekspor_seed_indikator.py dari Excel klasifikasi
 # ISV/IUP, di-commit ke git supaya deploy tidak butuh Excel sama sekali.
 BERKAS_SEED_INDIKATOR = Path(__file__).resolve().parent / "data" / "indikator_seed.json"
+FIELD_KLASIFIKASI = ("sasaran_visi", "misi_agenda", "arah_ie", "indikator_induk")
 
 
 def seed_indikator(session: Session, berkas: Path = BERKAS_SEED_INDIKATOR) -> int:
@@ -67,6 +69,30 @@ def seed_indikator(session: Session, berkas: Path = BERKAS_SEED_INDIKATOR) -> in
     )
     session.flush()
     return len(muatan["indikator"])
+
+
+def sinkronkan_klasifikasi(
+    session: Session, berkas: Path = BERKAS_SEED_INDIKATOR
+) -> list[tuple[str, str, object, object]]:
+    """Terapkan hanya empat field kerangka dari fixture ke database terpasang.
+
+    Fungsi ini sengaja tidak menyentuh metadata maupun nilai indikator. Commit
+    tetap menjadi keputusan pemanggil agar mode pratinjau tidak dapat menulis.
+    """
+    muatan = json.loads(berkas.read_text(encoding="utf-8"))
+    perubahan: list[tuple[str, str, object, object]] = []
+    for sumber in muatan["indikator"]:
+        indikator = repo_indikator.ambil(session, sumber["id_indikator"])
+        if indikator is None:
+            continue
+        for field in FIELD_KLASIFIKASI:
+            lama = getattr(indikator, field)
+            baru = sumber.get(field)
+            if lama != baru:
+                perubahan.append((indikator.id_indikator, field, lama, baru))
+                setattr(indikator, field, baru)
+    session.flush()
+    return perubahan
 
 
 def sandi_acak(panjang: int = PANJANG_SANDI_SEED) -> str:
@@ -108,11 +134,38 @@ def seed_akun(session: Session) -> list[tuple[str, str]]:
         baru.append((username, sandi))
 
     buat("admin", "Administrator Awal", Peran.ADMIN, KODE_PROVINSI)
+    buat("verifikator.65.1", "Verifikator Provinsi 1", Peran.VERIFIKATOR, KODE_PROVINSI)
     for kode, nama, _tingkat, _induk in WILAYAH_KALTARA:
         for nomor in range(1, OPERATOR_PER_WILAYAH + 1):
             buat(f"operator.{kode}.{nomor}", f"Operator {nama} {nomor}", Peran.OPERATOR, kode)
     session.flush()
     return baru
+
+
+def perintah_seed_uji(password: str) -> int:
+    """Siapkan akun berkredensial tetap hanya pada database SQLite uji lokal."""
+    path = settings.sqlite_path
+    nama_db = path.name.lower() if path else ""
+    if settings.is_production or path is None or not any(penanda in nama_db for penanda in ("uji", "test")):
+        print("DITOLAK: seed-uji hanya boleh memakai SQLite development dengan nama file mengandung 'uji' atau 'test'.")
+        return 2
+    if len(password) < 12:
+        print("DITOLAK: password uji minimal 12 karakter.")
+        return 2
+
+    with SessionLocal() as session:
+        pastikan_wilayah(session)
+        seed_akun(session)
+        akun = repo_pengguna.daftar_dengan_wilayah(session)
+        password_hash = hash_password(password)
+        for pengguna, _wilayah in akun:
+            repo_pengguna.ganti_password(pengguna, password_hash, wajib_ganti=False)
+            pengguna.aktif = True
+        session.commit()
+        print(f"Akun uji siap: {len(akun)} akun. Password bersama: {password}")
+        for pengguna, wilayah in akun:
+            print(f"  {pengguna.username.ljust(20)} {pengguna.peran.ljust(12)} {wilayah or '-'}")
+    return 0
 
 
 def perintah_seed(tampilkan_sandi: bool) -> int:
@@ -153,6 +206,23 @@ def perintah_seed_indikator() -> int:
         return 0
 
 
+def perintah_sinkronkan_klasifikasi(*, jalankan: bool) -> int:
+    with SessionLocal() as session:
+        perubahan = sinkronkan_klasifikasi(session)
+        print(f"Perubahan field klasifikasi: {len(perubahan)}")
+        for id_indikator, field, lama, baru in perubahan[:20]:
+            print(f"  {id_indikator} {field}: {lama!r} -> {baru!r}")
+        if len(perubahan) > 20:
+            print(f"  ... dan {len(perubahan) - 20} perubahan lain")
+        if not jalankan:
+            session.rollback()
+            print("Pratinjau saja; database tidak diubah. Tambahkan --jalankan untuk menerapkan.")
+            return 0
+        session.commit()
+        print("Klasifikasi kerangka pembangunan berhasil diperbarui.")
+        return 0
+
+
 def perintah_periksa() -> int:
     """Ringkasan cepat kesiapan basis data."""
     with SessionLocal() as session:
@@ -177,17 +247,32 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="cetak sandi awal ke layar (hanya di terminal yang aman)",
     )
+    seed_uji = sub.add_parser("seed-uji", help="reset akun pada SQLite uji lokal ke password yang ditentukan")
+    seed_uji.add_argument("--password", required=True, help="password bersama untuk seluruh akun uji")
     sub.add_parser("periksa", help="ringkasan kesiapan basis data")
     sub.add_parser(
         "seed-indikator",
         help="isi indikator+metadata+nilai baseline dari fixture bila tabel indikator kosong",
     )
+    sinkronkan = sub.add_parser(
+        "sinkronkan-klasifikasi",
+        help="pratinjau/perbarui empat klasifikasi kerangka tanpa menyentuh nilai",
+    )
+    sinkronkan.add_argument(
+        "--jalankan",
+        action="store_true",
+        help="terapkan perubahan; tanpa opsi ini hanya menampilkan pratinjau",
+    )
 
     argumen = parser.parse_args(argv)
     if argumen.perintah == "seed":
         return perintah_seed(argumen.tampilkan_sandi)
+    if argumen.perintah == "seed-uji":
+        return perintah_seed_uji(argumen.password)
     if argumen.perintah == "seed-indikator":
         return perintah_seed_indikator()
+    if argumen.perintah == "sinkronkan-klasifikasi":
+        return perintah_sinkronkan_klasifikasi(jalankan=argumen.jalankan)
     return perintah_periksa()
 
 

@@ -37,6 +37,22 @@ def _nilai_sel(sel: Any) -> Any:
     return str(mentah)
 
 
+def _baca_sheet(sheet: Any) -> list[list[Any]]:
+    """Baca sampai baris data terakhir, bukan sampai batas format Excel.
+
+    Beberapa editor menandai seluruh kolom sebagai used range. Menghentikan
+    pembacaan pada baris kosong pertama setelah data menjaga unggahan tetap
+    cepat tanpa mengubah kontrak bahwa baris master/nilai harus rapat.
+    """
+    hasil: list[list[Any]] = []
+    for baris in sheet.iter_rows():
+        nilai = [_nilai_sel(sel) for sel in baris]
+        if hasil and all(item is None for item in nilai):
+            break
+        hasil.append(nilai)
+    return hasil
+
+
 def baca_workbook(isi: bytes, nama_berkas: str) -> dict[str, Any]:
     """Ubah byte .xlsx menjadi bentuk `{"source": ..., "sheets": {...}}`.
 
@@ -53,9 +69,7 @@ def baca_workbook(isi: bytes, nama_berkas: str) -> dict[str, Any]:
         hilang = [nama for nama in SHEET_WAJIB if nama not in tersedia]
         if hilang:
             raise DatasetTidakValid(f"Sheet '{hilang[0]}' tidak ditemukan di workbook")
-        sheets = {
-            nama: [[_nilai_sel(sel) for sel in baris] for baris in workbook[nama].iter_rows()] for nama in SHEET_WAJIB
-        }
+        sheets = {nama: _baca_sheet(workbook[nama]) for nama in SHEET_WAJIB}
     finally:
         # Mode read_only menahan handle berkas sampai ditutup eksplisit.
         workbook.close()

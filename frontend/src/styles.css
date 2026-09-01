@@ -4275,6 +4275,8 @@ html:has(.home-app) { scroll-snap-type: y proximity; }
 }
 .unggah-kabar.warning { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
 .unggah-kabar.success { background: var(--success-soft); border-color: var(--success); color: var(--success); }
+.verification-queue .unggah-kabar { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.verification-queue .unggah-kabar + .unggah-kabar { margin-top: var(--sp-2); }
 .unggah-belum { color: var(--muted); font-style: italic; }
 /* Seluruh warna memakai token yang sudah ada; badge konflik meminjam
    `indicator-state proxy` supaya bahasanya sama dengan tabel indikator. */

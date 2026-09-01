@@ -32,6 +32,15 @@ def ambil_usulan_menunggu(session: Session, usulan_id: int) -> UsulanNilai | Non
     return session.scalars(stmt).first()
 
 
+def daftar_usulan_batch_menunggu(session: Session, batch_id: str) -> list[UsulanNilai]:
+    stmt = (
+        select(UsulanNilai)
+        .where(UsulanNilai.batch_id == batch_id, UsulanNilai.status == StatusVerifikasi.MENUNGGU)
+        .order_by(UsulanNilai.id)
+    )
+    return list(session.scalars(stmt))
+
+
 def daftar_usulan(
     session: Session,
     *,
@@ -84,8 +93,10 @@ def daftar_usulan(
                 "jenis": usulan.jenis,
                 "periode": usulan.periode,
                 "nilai": usulan.nilai,
+                "nilai_teks": usulan.nilai_teks,
                 "sumber": usulan.sumber,
                 "catatan": usulan.catatan,
+                "batch_id": usulan.batch_id,
                 "status": usulan.status,
                 "pengusul_id": usulan.pengusul_id,
                 "verifikator_id": usulan.verifikator_id,

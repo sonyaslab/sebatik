@@ -15,6 +15,21 @@ class UsulanDibuatResponse(BaseModel):
     jumlah_bukti: int
 
 
+class UnggahanMassalResponse(BaseModel):
+    status: str
+    jumlah_usulan: int
+    jumlah_angka: int
+    jumlah_teks: int
+    wilayah_kode: str
+    batch_id: str
+
+
+class KeputusanBatchResponse(BaseModel):
+    status: str
+    batch_id: str
+    jumlah_usulan: int
+
+
 class BarisUsulan(BaseModel):
     id: int
     id_indikator: str
@@ -23,8 +38,10 @@ class BarisUsulan(BaseModel):
     jenis: str
     periode: int | None = None
     nilai: float | None = None
+    nilai_teks: str | None = None
     sumber: str | None = None
     catatan: str | None = None
+    batch_id: str | None = None
     status: str
     pengusul_id: int | None = None
     verifikator_id: int | None = None

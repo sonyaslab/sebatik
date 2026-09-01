@@ -47,6 +47,11 @@ export const berkasBukti = (usulanId, buktiId) =>
   requestMentah(`${V1}/admin/usulan/${usulanId}/bukti/${buktiId}`)
 export const verifikasiUsulan = (id, form) =>
   request(`${V1}/admin/usulan/${id}/verifikasi`, {method: 'POST', body: form, ...wajib})
+export const verifikasiBatchUsulan = (id, form) =>
+  request(`${V1}/admin/usulan/batch/${id}/verifikasi`, {method: 'POST', body: form, ...wajib})
+export const unduhTemplateOperator = () => requestMentah(`${V1}/operator/unggah-template`)
+export const unggahRealisasiOperator = form =>
+  request(`${V1}/operator/unggah`, {method: 'POST', body: form, ...wajib})
 export const daftarPengguna = () => request(`${V1}/admin/pengguna`, wajib)
 export const buatPengguna = form =>
   request(`${V1}/admin/pengguna`, {method: 'POST', body: form, ...wajib})

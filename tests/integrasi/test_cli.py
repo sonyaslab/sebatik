@@ -22,14 +22,15 @@ def test_sandi_acak_panjang_dan_tidak_berulang():
     assert satu != dua
 
 
-def test_seed_membuat_admin_dan_operator_tiap_wilayah(session):
+def test_seed_membuat_admin_verifikator_dan_operator_tiap_wilayah(session):
     pastikan_wilayah(session)
     baru = seed_akun(session)
 
-    diharapkan = 1 + len(WILAYAH_KALTARA) * OPERATOR_PER_WILAYAH
+    diharapkan = 2 + len(WILAYAH_KALTARA) * OPERATOR_PER_WILAYAH
     assert len(baru) == diharapkan
     username = {nama for nama, _ in baru}
     assert "admin" in username
+    assert "verifikator.65.1" in username
     assert "operator.6501.1" in username
 
 
@@ -130,3 +131,49 @@ def test_seed_indikator_dilewati_saat_sudah_terisi(session, tmp_path):
 
     assert jumlah == 0
     assert repo_indikator.jumlah(session) == 1
+
+
+def test_sinkronkan_klasifikasi_hanya_mengubah_empat_field(session, tmp_path):
+    import json
+
+    from backend.app.cli import sinkronkan_klasifikasi
+    from backend.app.models import Indikator
+
+    indikator = Indikator(
+        id_indikator="IUP-001",
+        kategori="IUP",
+        nomor=1,
+        nama_indikator="Nama tetap",
+        sasaran_visi=None,
+        misi_agenda=None,
+        arah_ie="Arah lama",
+        indikator_induk=None,
+    )
+    session.add(indikator)
+    session.flush()
+    berkas = tmp_path / "seed.json"
+    berkas.write_text(
+        json.dumps(
+            {
+                "indikator": [
+                    {
+                        "id_indikator": "IUP-001",
+                        "nama_indikator": "Nama dari seed tidak boleh diterapkan",
+                        "sasaran_visi": None,
+                        "misi_agenda": "Transformasi Sosial",
+                        "arah_ie": "Kesehatan untuk Semua",
+                        "indikator_induk": "Usia Harapan Hidup",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    perubahan = sinkronkan_klasifikasi(session, berkas)
+
+    assert len(perubahan) == 3
+    assert indikator.nama_indikator == "Nama tetap"
+    assert indikator.misi_agenda == "Transformasi Sosial"
+    assert indikator.arah_ie == "Kesehatan untuk Semua"
+    assert indikator.indikator_induk == "Usia Harapan Hidup"

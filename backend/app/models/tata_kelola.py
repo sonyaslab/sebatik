@@ -33,9 +33,11 @@ class UsulanNilai(Base):
     tahun: Mapped[int] = mapped_column(Integer, nullable=False)
     jenis: Mapped[str] = mapped_column(String(12), nullable=False)
     periode: Mapped[int | None] = mapped_column(Integer)
-    nilai: Mapped[float] = mapped_column(Numeric(20, 6), nullable=False)
+    nilai: Mapped[float | None] = mapped_column(Numeric(20, 6))
+    nilai_teks: Mapped[str | None] = mapped_column(Text)
     sumber: Mapped[str] = mapped_column(Text, nullable=False)
     catatan: Mapped[str | None] = mapped_column(Text)
+    batch_id: Mapped[str | None] = mapped_column(String(32))
 
     status: Mapped[str] = mapped_column(String(24), nullable=False, default=StatusVerifikasi.MENUNGGU)
     pengusul_id: Mapped[int] = mapped_column(ForeignKey("pengguna.id"), nullable=False)
@@ -56,9 +58,14 @@ class UsulanNilai(Base):
             name="ck_usulan_status",
         ),
         CheckConstraint("periode IS NULL OR periode BETWEEN 1 AND 4", name="ck_usulan_periode"),
+        CheckConstraint(
+            "(nilai IS NOT NULL AND nilai_teks IS NULL) OR (nilai IS NULL AND nilai_teks IS NOT NULL)",
+            name="ck_usulan_tepat_satu_nilai",
+        ),
         Index("ix_usulan_status", "status"),
         Index("ix_usulan_wilayah", "wilayah_kode"),
         Index("ix_usulan_pengusul", "pengusul_id"),
+        Index("ix_usulan_batch", "batch_id"),
     )
 
 

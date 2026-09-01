@@ -48,6 +48,7 @@ from openpyxl import load_workbook
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.etl.common import clean_text, parse_angka  # noqa: E402
+from src.etl.klasifikasi import klasifikasi_kerangka  # noqa: E402
 from src.etl.transform.proxy import ekstrak_proxy  # noqa: E402
 
 SHEET_INDIKATOR = "Basis Data Indikator"
@@ -92,6 +93,8 @@ def baca_indikator_dan_metadata(wb: Any) -> tuple[list[dict[str, Any]], list[dic
     for baris in range(2, ws.max_row + 1):
         id_indikator = clean_text(sel(baris, "ID Indikator"))
         if not id_indikator:
+            if indikator:
+                break
             continue
 
         kategori = (clean_text(sel(baris, "Kategori")) or "").upper()
@@ -102,7 +105,6 @@ def baca_indikator_dan_metadata(wb: Any) -> tuple[list[dict[str, Any]], list[dic
         # lihat catatan di docstring modul ini.
         kolom_arah = clean_text(sel(baris, "Arah Pembangunan"))
         arah_pembangunan = kolom_arah if kategori == "ISV" else None
-        arah_ie = kolom_arah if kategori == "IUP" else None
 
         is_proxy, nama_proxy = ekstrak_proxy(
             sel(baris, "Indikator Proxy?"),
@@ -117,6 +119,7 @@ def baca_indikator_dan_metadata(wb: Any) -> tuple[list[dict[str, Any]], list[dic
         frekuensi = clean_text(sel(baris, "Frekuensi (RPJPD Provinsi)"))
         status_metadata = clean_text(sel(baris, "Status Metadata"))
         tahun_terakhir = parse_angka(sel(baris, "Tahun Data Terakhir"))
+        klasifikasi = klasifikasi_kerangka({label: sel(baris, label) for label in header})
 
         indikator.append(
             {
@@ -127,7 +130,7 @@ def baca_indikator_dan_metadata(wb: Any) -> tuple[list[dict[str, Any]], list[dic
                 "nama_indikator": clean_text(sel(baris, "Nama Indikator (RPJPD Provinsi / dipakai Kaltara)")),
                 "kelompok": clean_text(sel(baris, "Kelompok / Pilar")),
                 "arah_pembangunan": arah_pembangunan,
-                "arah_ie": arah_ie,
+                **klasifikasi,
                 "kelompok_makro": clean_text(sel(baris, "Kelompok Makro")),
                 "opd_pengampu": clean_text(sel(baris, "Perangkat Daerah Pengampu (Kaltara)")),
                 "sumber_data": sumber_data,
@@ -152,7 +155,6 @@ def baca_indikator_dan_metadata(wb: Any) -> tuple[list[dict[str, Any]], list[dic
                 "status_metadata": status_metadata,
             }
         )
-
     return indikator, metadata
 
 
@@ -185,6 +187,8 @@ def baca_nilai(wb: Any, indeks: dict[tuple[str, str], str]) -> list[dict[str, An
     tak_dikenal: set[tuple[str, str]] = set()
     for baris in range(2, ws.max_row + 1):
         if not clean_text(sel(baris, "ID Indikator")):
+            if hasil:
+                break
             continue
 
         kunci = (
@@ -221,7 +225,6 @@ def baca_nilai(wb: Any, indeks: dict[tuple[str, str], str]) -> list[dict[str, An
                 "sumber": "seed_awal:BASIS_DATA_INDIKATOR_ISV-IUP_KALTARA.xlsx",
             }
         )
-
     if tak_dikenal:
         raise ValueError(
             "Baris nilai memakai (Kategori, Kode Indikator) yang tidak ada di sheet "
@@ -231,7 +234,10 @@ def baca_nilai(wb: Any, indeks: dict[tuple[str, str], str]) -> list[dict[str, An
 
 
 def main(sumber: Path, target: Path) -> None:
-    wb = load_workbook(sumber, data_only=True, read_only=True)
+    # Workbook kecil (86 indikator + 660 nilai). Mode normal jauh lebih cepat
+    # untuk pola akses berbasis header/sel di fungsi ini; pada read_only setiap
+    # ``ws.cell`` dapat memindai ulang XML sheet dari awal.
+    wb = load_workbook(sumber, data_only=True, read_only=False)
     indikator, metadata = baca_indikator_dan_metadata(wb)
     nilai = baca_nilai(wb, indeks_kanonis(indikator))
 

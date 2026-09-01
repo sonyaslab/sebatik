@@ -17,6 +17,7 @@ TANPA_SKEMA_JSON = {
     ("/api/v1/indikator/{id_indikator}/unduh.csv", "get"),
     ("/api/v1/download/paket.zip", "get"),
     ("/api/v1/admin/usulan/{usulan_id}/bukti/{bukti_id}", "get"),
+    ("/api/v1/operator/unggah-template", "get"),
 }
 
 

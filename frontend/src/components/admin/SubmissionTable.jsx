@@ -15,7 +15,7 @@ export function SubmissionTable({rows,canDecide=false,onEvidence,onDecision,onCo
           <tr key={row.id}>
             <td><b>{row.id_indikator}</b><small>Usulan #{row.id} · {dateText(row.dibuat_pada)}</small></td>
             <td>{row.wilayah}<small>{row.pengusul}</small></td>
-            <td><b>{fmt.format(row.nilai)}</b><small>{row.tahun} · {row.sumber}</small></td>
+            <td><b>{row.nilai_teks??fmt.format(row.nilai)}</b><small>{row.tahun} · {row.sumber}</small></td>
             <td>
               <button className="evidence-button" onClick={()=>onEvidence(row)}>
                 <Eye size={14}/>{row.jumlah_bukti} file

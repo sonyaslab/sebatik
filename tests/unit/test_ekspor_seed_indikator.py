@@ -106,7 +106,10 @@ def test_arah_pembangunan_untuk_isv_arah_ie_untuk_iup():
 
     assert isv["arah_pembangunan"] == "Peningkatan Pendapatan per Kapita"
     assert isv["arah_ie"] is None
-    assert iup["arah_ie"] == "IE1 - Kesehatan untuk Semua"
+    assert isv["sasaran_visi"] == "Peningkatan Pendapatan per Kapita"
+    assert iup["misi_agenda"] == "Transformasi Sosial"
+    assert iup["arah_ie"] == "Kesehatan untuk Semua"
+    assert iup["indikator_induk"] == "Usia Harapan Hidup"
     assert iup["arah_pembangunan"] is None
 
 

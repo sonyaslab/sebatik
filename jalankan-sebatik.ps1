@@ -7,7 +7,7 @@ Set-Location $ProjectRoot
 # langsung dari Windows, nama itu tidak tersedia; PostgreSQL dijangkau lewat
 # port host yang dipublikasikan oleh Docker Compose.
 $EnvFile = Join-Path $ProjectRoot '.env'
-if (Test-Path $EnvFile) {
+if ((-not $env:SEBATIK_DATABASE_URL) -and (Test-Path $EnvFile)) {
     $DatabaseLine = Get-Content $EnvFile | Where-Object { $_ -match '^SEBATIK_DATABASE_URL=' } | Select-Object -Last 1
     if ($DatabaseLine) {
         $DatabaseUrl = $DatabaseLine.Substring('SEBATIK_DATABASE_URL='.Length)
@@ -38,12 +38,25 @@ if (-not (Test-Path 'frontend\dist\index.html')) {
 $FallbackPython = Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
 $LocalPackages = Join-Path $ProjectRoot '.runtime-packages'
 if (Test-Path $PythonExe) {
-    & $PythonExe -c 'import fastapi, pydantic_settings, sqlalchemy, uvicorn' *> $null
+    $PreferensiSemula = $ErrorActionPreference
+    $ErrorActionPreference = 'SilentlyContinue'
+    & $PythonExe -c 'import fastapi, pydantic_settings, sqlalchemy, uvicorn' 2>$null
+    $KodeProbe = $LASTEXITCODE
+    $ErrorActionPreference = $PreferensiSemula
 }
 
-if ((Test-Path $PythonExe) -and ($LASTEXITCODE -eq 0)) {
+if ((Test-Path $PythonExe) -and ($KodeProbe -eq 0)) {
     & $PythonExe -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 } elseif ((Test-Path $FallbackPython) -and (Test-Path $LocalPackages)) {
+    $env:PYTHONPATH = $LocalPackages
+    $PreferensiSemula = $ErrorActionPreference
+    $ErrorActionPreference = 'SilentlyContinue'
+    & $FallbackPython -c 'import fastapi, pydantic_core, sqlalchemy, uvicorn; assert callable(getattr(uvicorn, "run", None))' 2>$null
+    $KodeFallback = $LASTEXITCODE
+    $ErrorActionPreference = $PreferensiSemula
+    if ($KodeFallback -ne 0) {
+        throw 'Runtime utama dan cadangan belum sehat. Sambungkan internet, lalu jalankan .\siapkan-uji-unggahan-operator.ps1 -Jalankan.'
+    }
     & $FallbackPython scripts\run_local_server.py
 } else {
     throw 'Runtime Python belum tersedia. Jalankan .\pasang-sebatik.ps1 terlebih dahulu.'

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..deps import get_session, id_terautentikasi, wajib_peran
 from ..models import Peran
 from ..repositories import indikator as repo_indikator
@@ -15,9 +17,16 @@ from ..repositories import tata_kelola as repo_tata_kelola
 from ..repositories import wilayah as repo_wilayah
 from ..repositories.pengguna import ProfilPengguna
 from ..schemas.umum import StatusResponse
-from ..schemas.usulan import DaftarBuktiResponse, DaftarUsulanResponse, UsulanDibuatResponse
+from ..schemas.usulan import (
+    DaftarBuktiResponse,
+    DaftarUsulanResponse,
+    KeputusanBatchResponse,
+    UnggahanMassalResponse,
+    UsulanDibuatResponse,
+)
 from ..services import Penolakan
 from ..services import bukti as svc_bukti
+from ..services import unggahan_operator as svc_unggahan_operator
 from ..services import verifikasi as svc_verifikasi
 
 router = APIRouter(prefix="/api/v1", tags=["usulan"])
@@ -25,6 +34,80 @@ router = APIRouter(prefix="/api/v1", tags=["usulan"])
 boleh_mengusulkan = wajib_peran(Peran.ADMIN, Peran.OPERATOR)
 boleh_melihat = wajib_peran(Peran.ADMIN, Peran.OPERATOR, Peran.VERIFIKATOR)
 boleh_memutuskan = wajib_peran(Peran.VERIFIKATOR)
+khusus_operator = wajib_peran(Peran.OPERATOR)
+
+
+@router.get("/operator/unggah-template", response_class=FileResponse)
+def unduh_template_operator(
+    pengguna: ProfilPengguna = Depends(khusus_operator),
+) -> FileResponse:
+    del pengguna
+    path = Path(__file__).resolve().parents[1] / "data" / "template_unggah_operator.xlsx"
+    if not path.exists():
+        raise HTTPException(503, "Template unggahan belum tersedia")
+    return FileResponse(path, media_type=svc_unggahan_operator.MIME_XLSX, filename="Template_Unggah_Realisasi_SEBATIK.xlsx")
+
+
+@router.post("/operator/unggah", response_model=UnggahanMassalResponse)
+async def unggah_usulan_massal(
+    berkas: UploadFile = File(...),
+    pengguna: ProfilPengguna = Depends(khusus_operator),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    nama = berkas.filename or "unggahan.xlsx"
+    if not nama.lower().endswith(".xlsx"):
+        raise HTTPException(422, "Berkas harus berformat .xlsx")
+    isi = await berkas.read()
+    if len(isi) > settings.max_unggah_bytes:
+        raise HTTPException(413, "Ukuran workbook melebihi batas unggahan")
+    if not pengguna.wilayah_kode:
+        raise HTTPException(422, "Akun operator belum memiliki wilayah")
+    baris = svc_unggahan_operator.baca(isi, pengguna.wilayah_kode)
+    if isinstance(baris, Penolakan):
+        raise HTTPException(baris.kode, baris.pesan)
+    hasil = svc_unggahan_operator.simpan(
+        session,
+        baris=baris,
+        wilayah_kode=pengguna.wilayah_kode,
+        pengusul_id=id_terautentikasi(pengguna),
+        nama_file=nama,
+        isi=isi,
+    )
+    if isinstance(hasil, Penolakan):
+        raise HTTPException(hasil.kode, hasil.pesan)
+    return hasil
+
+
+@router.post("/admin/usulan/batch/{batch_id}/verifikasi", response_model=KeputusanBatchResponse)
+def verifikasi_batch(
+    batch_id: str,
+    keputusan: str = Form(...),
+    alasan: str | None = Form(None),
+    pengguna: ProfilPengguna = Depends(boleh_memutuskan),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    usulan = repo_tata_kelola.daftar_usulan_batch_menunggu(session, batch_id)
+    if not usulan:
+        raise HTTPException(404, "Batch usulan tidak ditemukan")
+    verifikator_id = id_terautentikasi(pengguna)
+    penolakan = svc_verifikasi.periksa_keputusan(
+        keputusan=keputusan,
+        alasan=alasan,
+        peran_verifikator=pengguna.peran,
+        wilayah_verifikator=pengguna.wilayah_kode,
+        pengusul_id=usulan[0].pengusul_id,
+        verifikator_id=verifikator_id,
+    )
+    if penolakan:
+        raise HTTPException(penolakan.kode, penolakan.pesan)
+    jumlah = svc_verifikasi.putuskan_massal(
+        session,
+        usulan,
+        keputusan=keputusan,
+        alasan=alasan,
+        verifikator_id=verifikator_id,
+    )
+    return {"status": keputusan, "batch_id": batch_id, "jumlah_usulan": jumlah}
 
 
 @router.post("/admin/usulan", response_model=UsulanDibuatResponse)

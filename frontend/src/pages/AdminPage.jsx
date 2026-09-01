@@ -10,6 +10,7 @@ import {PasswordResetModal} from '../components/admin/PasswordResetModal'
 import {IndikatorManager} from '../components/admin/IndikatorManager'
 import {SubmissionTable} from '../components/admin/SubmissionTable'
 import {UnggahExcelPanel} from '../components/admin/UnggahExcelPanel'
+import {OperatorUploadPanel} from '../components/admin/OperatorUploadPanel'
 import {LoginShell} from '../components/layout/LoginShell'
 import {Shell} from '../components/layout/Shell'
 import {usePageTitle} from '../hooks/usePageTitle'
@@ -108,6 +109,20 @@ export default function AdminPage(){
     try{
       const result=await endpoints.verifikasiUsulan(submission.id,body)
       notifyOk(`Usulan ${result.status.toLowerCase()}.`)
+      refresh()
+    }catch(error){notify(error.message)}
+  }
+
+  const decideBatch=async(batchId,decision)=>{
+    let reason=null
+    if(decision==='DITOLAK'){reason=prompt('Tuliskan alasan penolakan seluruh batch');if(!reason)return}
+    if(decision==='DISETUJUI'&&!confirm('Setujui seluruh usulan dalam batch ini? Data akan tampil pada visualisasi.'))return
+    const body=new FormData()
+    body.set('keputusan',decision)
+    if(reason)body.set('alasan',reason)
+    try{
+      const result=await endpoints.verifikasiBatchUsulan(batchId,body)
+      notifyOk(`${result.jumlah_usulan} usulan dalam batch ${result.status.toLowerCase()}.`)
       refresh()
     }catch(error){notify(error.message)}
   }
@@ -389,6 +404,9 @@ export default function AdminPage(){
         </Reveal>
       </section>}
 
+    {me?.peran==='OPERATOR'&&
+      <OperatorUploadPanel onNotify={notify} onSelesai={refresh}/>}
+
     {(me?.peran==='VERIFIKATOR'||me?.peran==='ADMIN')&&
       <Panel
         delay={40}
@@ -398,6 +416,18 @@ export default function AdminPage(){
         desc="Periksa angka, sumber, dan bukti sebelum mengambil keputusan."
         actions={<span className="count-pill">{submissions.filter(x=>x.status==='MENUNGGU_VERIFIKASI').length} menunggu</span>}
       >
+        {me?.peran==='VERIFIKATOR'&&[...new Set(submissions
+          .filter(x=>x.status==='MENUNGGU_VERIFIKASI'&&x.batch_id)
+          .map(x=>x.batch_id))].map(batchId=>{
+            const rows=submissions.filter(x=>x.batch_id===batchId&&x.status==='MENUNGGU_VERIFIKASI')
+            return <div className="unggah-kabar" key={batchId}>
+              <span><b>Batch Excel {batchId.slice(0,8)}</b> · {rows.length} usulan · {rows[0]?.wilayah}</span>
+              <div className="row-actions">
+                <button className="approve" onClick={()=>decideBatch(batchId,'DISETUJUI')}>Setujui batch</button>
+                <button className="reject" onClick={()=>decideBatch(batchId,'DITOLAK')}>Tolak batch</button>
+              </div>
+            </div>
+          })}
         <SubmissionTable rows={submissions} canDecide={me?.peran==='VERIFIKATOR'} onEvidence={loadEvidence} onDecision={decide}/>
       </Panel>}
 

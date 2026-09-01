@@ -17,6 +17,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from .klasifikasi import klasifikasi_kerangka
+
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
@@ -104,6 +106,7 @@ def transformasi_sumber_database(isi: dict[str, Any]) -> dict[str, Any]:
         kode_master = _teks(baris.get("Kode Indikator"))
         if kode_master:
             indeks_kode[(kategori, kode_master)] = iid
+        klasifikasi = klasifikasi_kerangka(baris)
         indikator.append(
             {
                 "id_indikator": iid,
@@ -112,7 +115,8 @@ def transformasi_sumber_database(isi: dict[str, Any]) -> dict[str, Any]:
                 "kode_indikator": _teks(baris.get("Kode Indikator")),
                 "nama_indikator": _teks(baris.get("Nama Indikator (RPJPD Provinsi / dipakai Kaltara)")),
                 "kelompok": _teks(baris.get("Kelompok / Pilar")),
-                "arah_pembangunan": _teks(baris.get("Arah Pembangunan")),
+                "arah_pembangunan": _teks(baris.get("Arah Pembangunan")) if kategori == "ISV" else None,
+                **klasifikasi,
                 "satuan": None,
                 "opd_pengampu": _teks(baris.get("Perangkat Daerah Pengampu (Kaltara)")),
                 "sumber_data": _teks(baris.get("Sumber Data (RPJPD Provinsi)")),
